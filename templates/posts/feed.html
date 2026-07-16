@@ -1,19 +1,38 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}게시물{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/feed.js' %}"></script>
+{% endblock %}
+
 {% block content %}
-<h1>게시물</h1>
-{% if posts %}
-    <ul>
+<div class="feed">
+    {% if posts %}
         {% for post in posts %}
-        <li>
-            <img src="{{ post.image.url }}" alt="{{ post.caption }}" width="200">
-            <p>{{ post.user }} - {{ post.caption }}</p>
-        </li>
+        <article class="post-card">
+            <header class="post-card__header">
+                <span class="post-card__username">{{ post.user }}</span>
+            </header>
+            <img class="post-card__image" src="{{ post.image.url }}" alt="{{ post.caption }}">
+            <div class="post-card__actions">
+                <button
+                    class="like-button {% if post.is_liked %}liked{% endif %}"
+                    data-post-id="{{ post.id }}"
+                >{% if post.is_liked %}♥{% else %}♡{% endif %} {{ post.like_count }}</button>
+
+                <span>💬 댓글</span>
+            </div>
+            <p class="post-card__caption"><strong>{{ post.user }}</strong> {{ post.caption }}</p>
+        </article>
         {% endfor %}
-    </ul>
-{% else %}
-    <p>게시물이 없습니다.</p>
-{% endif %}
+    {% else %}
+        <p class="feed__empty">게시물이 없습니다.</p>
+    {% endif %}
+</div>
 {% endblock %}
