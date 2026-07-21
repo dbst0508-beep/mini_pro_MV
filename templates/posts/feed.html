@@ -20,13 +20,31 @@
                 <span class="post-card__username">{{ post.user }}</span>
             </header>
             <img class="post-card__image" src="{{ post.image.url }}" alt="{{ post.caption }}">
-            <div class="post-card__actions">
+                       <div class="post-card__actions">
                 <button
                     class="like-button {% if post.is_liked %}liked{% endif %}"
                     data-post-id="{{ post.id }}"
                 >{% if post.is_liked %}♥{% else %}♡{% endif %} {{ post.like_count }}</button>
+            </div>
 
-                <span>💬 댓글</span>
+            <div class="comment-section" data-post-id="{{ post.id }}">
+                <ul class="comment-list">
+                    {% for comment in post.comments.all %}
+                     <li class="comment-list__item" data-comment-id="{{ comment.id }}">
+                        <strong>{{ comment.user }}</strong>
+                        <span class="comment-list__content">{{ comment.content }}</span>
+                        {% if comment.user == user %}
+                        <button class="comment-edit-button">수정</button>
+                        <button class="comment-delete-button">삭제</button>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+
+                <form class="comment-form">
+                    <input type="text" class="comment-form__input" placeholder="댓글 달기..." required>
+                    <button type="submit" class="comment-form__submit">게시</button>
+                </form>
             </div>
             <p class="post-card__caption"><strong>{{ post.user }}</strong> {{ post.caption }}</p>
         </article>
