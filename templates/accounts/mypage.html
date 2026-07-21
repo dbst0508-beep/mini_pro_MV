@@ -1,6 +1,27 @@
 {% extends "base.html" %}
+{% load static %}
+
 {% block title %}마이페이지{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/mypage.css' %}">
+{% endblock %}
+
 {% block content %}
-<h1>마이페이지</h1>
-<p>준비 중입니다.</p>
+<div class="mypage">
+    <header class="mypage__header">
+        <span class="mypage__username">{{ user.username }}</span>
+        <span class="mypage__post-count">게시물 {{ posts.count }}개</span>
+    </header>
+
+    {% if posts %}
+    <div class="mypage__grid">
+        {% for post in posts %}
+        <img class="mypage__thumbnail" src="{{ post.image.url }}" alt="{{ post.caption }}">
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="mypage__empty">아직 올린 게시물이 없습니다.</p>
+    {% endif %}
+</div>
 {% endblock %}
