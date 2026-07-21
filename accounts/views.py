@@ -3,6 +3,8 @@ from .forms import SignUpForm
 from django.contrib.auth import login,logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required  # 로그인 안 했으면 자동으로 로그인 페이지로 보내주는 데코레이터
+from posts.models import Post  # 다른 앱(posts)의 모델을 가져다 씀 (마이페이지에서 내 게시물을 조회해야 하니까)
 
 def signup_page(request):  # 회원가입 페이지 뷰
     if request.user.is_authenticated:  # 이미 로그인된 상태라면
@@ -18,8 +20,10 @@ def signup_page(request):  # 회원가입 페이지 뷰
 
     return render(request, "accounts/signup.html", {"form": form})  # POST 실패 시에도 여기로 와서 에러 메시지 포함해 다시 보여줌
 
+@login_required(login_url="accounts:login_page")  # 비로그인이면 이 함수 실행 전에 자동으로 로그인 페이지로 리다이렉트
 def mypage(request):
-    return render(request, "accounts/mypage.html")
+    posts = Post.objects.filter(user=request.user).order_by("-created_at")  # 로그인한 본인이 올린 게시물만, 최신순으로 조회
+    return render(request, "accounts/mypage.html", {"posts": posts})
 
 
 def login_page(request):  # 로그인 페이지 뷰

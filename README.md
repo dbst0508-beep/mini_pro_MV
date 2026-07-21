@@ -1,4 +1,4 @@
-d# Mini Project 1 — 패션 SNS
+# Mini Project 1 — 패션 SNS
 
 이미지를 올려 스타일을 공유하고, 좋아요·댓글로 소통하는 패션 SNS 서비스입니다.
 Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일 분석은 별도 FastAPI 서버가 콜백 방식으로 처리하는 구조를 목표로 합니다.
@@ -32,7 +32,7 @@ media/          # 업로드된 게시물 이미지
   - `/signup/` — 회원가입 (아이디/비밀번호), 이미 로그인한 상태면 피드로 리다이렉트
   - `/login/` — 로그인, 이미 로그인한 상태면 피드로 리다이렉트
   - `/logout/` — 로그아웃 (POST 전용, GET 요청으로는 접근 차단)
-- `/mypage/` — 마이페이지 (현재 화면 뼈대만 존재)
+- `/mypage/` — 마이페이지, 로그인한 본인 게시물만 3열 그리드로 표시 (비로그인 접근 시 로그인 페이지로 리다이렉트)
 
 ### posts
 - `Post`: 이미지 + 캡션 게시물
@@ -66,9 +66,10 @@ uv run python manage.py runserver
 ```bash
 uv run python manage.py test posts
 uv run python manage.py test accounts
+```
 
 - posts: 좋아요/댓글 생성·조회·수정·삭제, 게시물 등록 API 테스트 (16개)
-- accounts: 회원가입/로그인/로그아웃 테스트 (11개)
+- accounts: 회원가입/로그인/로그아웃/마이페이지 테스트 (13개)
 
 ## 참고
 
