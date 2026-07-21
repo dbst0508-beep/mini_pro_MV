@@ -13,3 +13,5 @@ wheels/
 db.sqlite3
 media/
 
+.claude
+
