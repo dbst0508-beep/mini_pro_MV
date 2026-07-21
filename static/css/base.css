@@ -37,6 +37,12 @@ body {
     font-size: 16px;
 }
 
+.top-bar__auth {
+    display: flex;       /* 안의 로그인/회원가입(또는 이름/로그아웃)을 가로로 나란히 배치 */
+    align-items: center; /* 세로 중앙 정렬, 버튼/텍스트 높이 맞춤 */
+    gap: 12px;            /* 로그인과 회원가입 사이 간격 */
+}
+
 
 .bottom-nav {
     position: fixed;

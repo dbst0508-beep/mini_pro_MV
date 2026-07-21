@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{# base.html의 골격(상단바/하단 네비 등)을 그대로 물려받음 #}
+
+{% block title %}회원가입{% endblock %}
+{# <title> 태그 안 내용을 "회원가입"으로 채움 #}
+
+{% block content %}
+{# base.html의 {% block content %}{% endblock %} 자리에 아래 내용이 들어감 #}
+
+<h1>회원가입</h1>
+
+<form method="post">
+    {# method="post": 서버에 데이터를 "제출"하는 요청임을 명시 (GET이면 안 됨, 회원정보가 URL에 노출됨) #}
+
+    {% csrf_token %}
+    {# Django의 CSRF 보호 토큰. 이게 없으면 POST 요청 자체가 서버에서 403으로 거부됨 (보안 필수 요소) #}
+
+    {{ form.as_p }}
+    {# views.py에서 넘겨준 SignUpForm 인스턴스를 <p> 태그로 감싼 input들로 자동 렌더링 (username, password1, password2 3개 필드 + 각 필드의 에러 메시지까지 자동 표시) #}
+
+    <button type="submit">가입하기</button>
+    {# 누르면 이 <form>이 method="post"로 현재 URL(/signup/)에 제출됨 #}
+</form>
+
+<p><a href="{% url 'accounts:login_page' %}">이미 계정이 있으신가요? 로그인</a></p>
+{# 로그인 페이지로 이동하는 링크. 여긴 그냥 페이지 이동이라 GET 링크(<a>)로 써도 안전함 #}
+
+{% endblock %}
