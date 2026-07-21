@@ -9,8 +9,8 @@ function getCookie(name) {
 
 const csrftoken = getCookie("csrftoken");  // 이 페이지의 CSRF 토큰 값을 미리 읽어둠
 
-// class="like-button"인 버튼을 전부 찾아서, 각각에 클릭 이벤트를 등록
-document.querySelectorAll(".like-button").forEach((button) => {
+// 좋아요 버튼 "하나"에 클릭 이벤트를 걸어주는 함수. 기존 버튼이든 새로 만든 버튼이든 이 함수 하나로 재사용함
+function attachLikeHandler(button) {
     button.addEventListener("click", async () => {
         const postId = button.dataset.postId;  // HTML의 data-post-id 값을 읽음
 
@@ -33,9 +33,11 @@ document.querySelectorAll(".like-button").forEach((button) => {
             button.textContent = `♡ ${data.like_count}`;
         }
     });
-});
-// class="comment-form"인 폼을 전부 찾아서, 각각에 제출 이벤트를 등록
-document.querySelectorAll(".comment-form").forEach((form) => {
+}
+// class="like-button"인 버튼을 전부 찾아서, 각각에 위 함수로 이벤트를 걸어줌
+document.querySelectorAll(".like-button").forEach(attachLikeHandler);
+// 댓글 작성 폼 "하나"에 제출 이벤트를 걸어주는 함수. 기존 폼이든 새로 만든 폼이든 이 함수 하나로 재사용함
+function attachCommentFormHandler(form) {
     form.addEventListener("submit", async (event) => {
         event.preventDefault();  // 폼의 기본 동작(페이지 새로고침)을 막음
 
@@ -74,13 +76,12 @@ document.querySelectorAll(".comment-form").forEach((form) => {
 
         list.appendChild(item);  // 만든 <li>를 목록 맨 끝에 실제로 붙임
 
-        // 방금 만든 수정/삭제 버튼에도, 1~2단계에서 만든 함수를 그대로 재사용해서 이벤트를 걸어줌
+        // 방금 만든 수정/삭제 버튼에도, 아래에서 만든 함수를 그대로 재사용해서 이벤트를 걸어줌
         attachDeleteHandler(item.querySelector(".comment-delete-button"));
         attachEditHandler(item.querySelector(".comment-edit-button"));
         input.value = "";  // 등록 후 입력창을 다시 빈 칸으로 비움
     });
-});
-
+}
 // 삭제 버튼 "하나"에 클릭 이벤트를 걸어주는 함수. 기존 버튼이든 새로 만든 버튼이든 이 함수 하나로 재사용함
 function attachDeleteHandler(button) {
     button.addEventListener("click", async () => {
@@ -162,3 +163,59 @@ function attachEditHandler(button) {
 
 // class="comment-edit-button"인 버튼을 전부 찾아서, 각각에 위 함수로 이벤트를 걸어줌
 document.querySelectorAll(".comment-edit-button").forEach(attachEditHandler);
+
+const uploadForm = document.querySelector(".post-upload-form");  // 업로드 폼 (비로그인 유저는 애초에 없을 수 있음)
+
+if (uploadForm) {  // 폼이 있을 때만(=로그인한 경우만) 이벤트를 검
+    uploadForm.addEventListener("submit", async (event) => {
+        event.preventDefault();  // 폼의 기본 동작(페이지 새로고침) 막음
+
+        const formData = new FormData(uploadForm);  // 폼 안의 input들을 name 속성 기준으로 자동으로 모아줌 (파일 포함)
+
+        // 서버의 게시물 생성 API로 POST 요청을 보냄
+        const response = await fetch("/api/posts/", {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": csrftoken,  // CSRF 토큰만 실어 보냄 (Content-Type은 일부러 안 씀, 아래 설명)
+            },
+            body: formData,  // FormData를 그대로 body에 넣음
+        });
+
+        if (!response.ok) {
+            alert("게시물을 등록하지 못했습니다. 이미지를 확인해주세요.");
+            return;
+        }
+
+        const post = await response.json();  // 서버가 만들어준 게시물 정보(id, user, image, caption 등)
+
+        const article = document.createElement("article");  // 새 게시물 카드를 담을 태그
+        article.className = "post-card";  // feed.html의 기존 카드와 동일한 클래스
+
+        // 서버가 렌더링하는 게시물 카드와 똑같은 구조로 채움 (좋아요 0, 댓글 없음인 상태로 시작)
+        article.innerHTML = `
+            <header class="post-card__header">
+                <span class="post-card__username">${post.user}</span>
+            </header>
+            <img class="post-card__image" src="${post.image}" alt="${post.caption}">
+            <div class="post-card__actions">
+                <button class="like-button" data-post-id="${post.id}">♡ 0</button>
+            </div>
+            <div class="comment-section" data-post-id="${post.id}">
+                <ul class="comment-list"></ul>
+                <form class="comment-form">
+                    <input type="text" class="comment-form__input" placeholder="댓글 달기..." required>
+                    <button type="submit" class="comment-form__submit">게시</button>
+                </form>
+            </div>
+            <p class="post-card__caption"><strong>${post.user}</strong> ${post.caption}</p>
+        `;
+
+        uploadForm.after(article);  // 업로드 폼 바로 다음(=피드 맨 위)에 새 카드를 끼워 넣음
+
+        // 새로 만든 카드 안의 좋아요 버튼/댓글 폼에도 이벤트를 걸어줌 (방금 함수로 분리해둔 덕분에 가능)
+        attachLikeHandler(article.querySelector(".like-button"));
+        attachCommentFormHandler(article.querySelector(".comment-form"));
+
+        uploadForm.reset();  // 폼 입력값(선택한 파일, 캡션)을 전부 비움
+    });
+}
