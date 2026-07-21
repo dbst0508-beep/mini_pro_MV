@@ -114,3 +114,31 @@
     color: #8e8e8e;     /* 옅은 회색 */
     cursor: pointer;
 }
+.post-upload-form {
+    background: #fff;              /* post-card랑 통일된 흰 배경 */
+    border: 1px solid #dbdbdb;     /* post-card와 동일한 테두리 색 */
+    border-radius: 8px;            /* post-card와 동일한 둥근 모서리 */
+    margin-bottom: 24px;           /* 아래 게시물 카드들과 간격 (post-card의 margin-bottom과 동일값) */
+    padding: 12px;                 /* 안쪽 여백 */
+    display: flex;                 /* 파일선택/캡션/버튼을 세로로 쌓기 위해 flex 사용 */
+    flex-direction: column;        /* 가로가 아니라 세로로 나열 */
+    gap: 8px;                      /* 요소 사이 간격 */
+}
+
+.post-upload-form__caption {
+    border: 1px solid #dbdbdb;     /* 입력창 티가 나도록 얇은 테두리 */
+    border-radius: 4px;            /* 살짝 둥글게 */
+    padding: 8px;                  /* 입력창 안쪽 여백 */
+    font-size: 14px;               /* 다른 텍스트들과 크기 통일 */
+}
+
+.post-upload-form__submit {
+    align-self: flex-end;          /* 부모(column) 안에서 이 버튼만 오른쪽 정렬 */
+    border: none;
+    background: #0095f6;           /* comment-form__submit과 같은 파란 톤이지만 배경째로 채워서 "주요 버튼" 느낌 */
+    color: #fff;
+    font-weight: bold;
+    padding: 6px 16px;
+    border-radius: 4px;
+    cursor: pointer;               /* 클릭 가능하다는 신호 */
+}

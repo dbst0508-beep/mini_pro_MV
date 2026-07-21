@@ -13,6 +13,20 @@
 
 {% block content %}
 <div class="feed">
+    {% if user.is_authenticated %}
+    {# 로그인 안 한 사람은 API가 어차피 거부하니, 화면에서도 폼 자체를 안 보여줌 #}
+    <form class="post-upload-form" enctype="multipart/form-data">
+        {# enctype="multipart/form-data": 이미지 파일을 담아 보내려면 이 설정이 필요 (JS로 가로챌 거라 사실상 대비용) #}
+
+        <input type="file" name="image" class="post-upload-form__image" accept="image/*" required>
+        {# type="file": 파일 선택 버튼. accept="image/*"로 이미지 파일만 고르도록 유도, required로 필수 지정 #}
+
+        <input type="text" name="caption" class="post-upload-form__caption" placeholder="캡션을 입력하세요">
+        {# 캡션은 모델에서 blank=True(선택 사항)라 required 안 붙임 #}
+
+        <button type="submit" class="post-upload-form__submit">게시하기</button>
+    </form>
+    {% endif %}
     {% if posts %}
         {% for post in posts %}
         <article class="post-card">
