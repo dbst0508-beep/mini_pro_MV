@@ -28,8 +28,11 @@ media/          # 업로드된 게시물 이미지
 
 ### accounts
 - `AUTH_USER_MODEL`을 커스텀 `User`(`AbstractUser` 상속)로 교체
-- `/mypage/`, `/login/` 페이지 (현재 화면 뼈대만 존재, 로그인 로직 미구현)
-
+- 세션 기반 회원가입 / 로그인 / 로그아웃 구현
+  - `/signup/` — 회원가입 (아이디/비밀번호), 이미 로그인한 상태면 피드로 리다이렉트
+  - `/login/` — 로그인, 이미 로그인한 상태면 피드로 리다이렉트
+  - `/logout/` — 로그아웃 (POST 전용, GET 요청으로는 접근 차단)
+- `/mypage/` — 마이페이지 (현재 화면 뼈대만 존재)
 
 ### posts
 - `Post`: 이미지 + 캡션 게시물
@@ -56,6 +59,15 @@ uv sync
 uv run python manage.py migrate
 uv run python manage.py runserver
 ```
+
+## 테스트 실행
+
+```bash
+uv run python manage.py test posts
+uv run python manage.py test accounts
+
+- posts: 좋아요/댓글 생성·조회·수정·삭제 API 테스트 (11개)
+- accounts: 회원가입/로그인/로그아웃 테스트 (11개)
 
 ## 참고
 
