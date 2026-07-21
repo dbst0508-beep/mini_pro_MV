@@ -1,0 +1,116 @@
+.feed {
+    max-width: 470px;   /* 인스타그램 피드 폭과 비슷하게 제한 */
+    margin: 0 auto;      /* 가운데 정렬 */
+    padding: 16px;
+}
+
+.post-card {
+    background: #fff;
+    border: 1px solid #dbdbdb;
+    border-radius: 8px;   /* 모서리 둥글게 */
+    margin-bottom: 24px;  /* 카드 사이 간격 */
+    overflow: hidden;      /* 이미지가 둥근 모서리 밖으로 안 튀어나오게 */
+}
+
+.post-card__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+}
+
+.post-card__username {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.post-card__image {
+    width: 100%;
+    display: block;
+    aspect-ratio: 1 / 1;   /* 항상 정사각형 비율 유지 */
+    object-fit: cover;      /* 비율 유지하며 꽉 채우고, 넘치는 부분은 잘라냄 */
+}
+
+.post-card__actions {
+    display: flex;
+    gap: 16px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+.post-card__caption {
+    padding: 0 12px 12px;
+    font-size: 14px;
+    margin: 0;
+}
+
+.feed__empty {
+    text-align: center;
+    color: #999;
+    padding: 40px 0;
+}
+
+.like-button {
+    border: none;
+    background: none;
+    cursor: pointer;   /* 마우스 올리면 손가락 커서로 바뀜 (클릭 가능하다는 신호) */
+    font-size: 14px;
+    padding: 0;
+    color: #333;
+}
+
+.like-button.liked {
+    color: #ed4956;    /* 좋아요 눌렀을 때 빨간색 */
+    font-weight: bold;
+}
+
+.comment-section {
+    padding: 0 12px 12px;   /* post-card__caption과 좌우 여백 통일 */
+}
+
+.comment-list {
+    list-style: none;   /* <li> 앞에 자동으로 붙는 점(•) 제거 */
+    margin: 0;
+    padding: 0;
+}
+
+.comment-list__item {
+    display: flex;            /* 작성자/내용/버튼을 가로로 나란히 배치 */
+    align-items: baseline;    /* 글자들의 밑줄 기준선을 맞춰서 자연스럽게 정렬 */
+    gap: 6px;                 /* 요소 사이 살짝 간격 */
+    font-size: 14px;
+    margin-bottom: 4px;   /* 댓글 사이 간격 */
+}
+
+.comment-form {
+    display: flex;         /* 입력창과 버튼을 가로로 나란히 배치 */
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.comment-form__input {
+    flex: 1;                /* 남는 공간을 입력창이 다 차지하도록 */
+    border: none;
+    border-top: 1px solid #efefef;   /* 위에 얇은 구분선 */
+    padding: 8px 0;
+    font-size: 14px;
+    outline: none;           /* 클릭했을 때 브라우저 기본 파란 테두리 제거 */
+}
+
+.comment-form__submit {
+    border: none;
+    background: none;
+    color: #0095f6;           /* 인스타그램 느낌의 파란 버튼 텍스트 */
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.comment-edit-button,
+.comment-delete-button {
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 12px;    /* 댓글 본문(14px)보다 작게 */
+    color: #8e8e8e;     /* 옅은 회색 */
+    cursor: pointer;
+}
