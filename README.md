@@ -1,4 +1,4 @@
-# Mini Project 1 — 패션 SNS
+d# Mini Project 1 — 패션 SNS
 
 이미지를 올려 스타일을 공유하고, 좋아요·댓글로 소통하는 패션 SNS 서비스입니다.
 Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일 분석은 별도 FastAPI 서버가 콜백 방식으로 처리하는 구조를 목표로 합니다.
@@ -39,6 +39,7 @@ media/          # 업로드된 게시물 이미지
 - `Comment`: 게시물별 댓글 (N:1)
 - `Like`: 게시물별 좋아요 (post, user 조합 unique)
 - `/` : 피드 페이지 (좋아요 개수, 댓글 목록, 로그인 유저의 좋아요 여부 표시)
+  - 로그인 유저는 피드 상단 인라인 폼으로 이미지+캡션 게시물 등록 가능 (등록 즉시 새 카드가 피드 최상단에 반영)
   - 댓글 작성 / 수정 / 삭제는 새로고침 없이 JS(`fetch`)로 처리 (작성자 본인만 수정·삭제 가능)
 - DRF API
   - `GET/POST /api/posts/` — 게시물 목록 조회 / 작성
@@ -66,7 +67,7 @@ uv run python manage.py runserver
 uv run python manage.py test posts
 uv run python manage.py test accounts
 
-- posts: 좋아요/댓글 생성·조회·수정·삭제 API 테스트 (11개)
+- posts: 좋아요/댓글 생성·조회·수정·삭제, 게시물 등록 API 테스트 (16개)
 - accounts: 회원가입/로그인/로그아웃 테스트 (11개)
 
 ## 참고
