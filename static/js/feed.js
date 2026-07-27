@@ -82,6 +82,9 @@ function attachCommentFormHandler(form) {
         input.value = "";  // 등록 후 입력창을 다시 빈 칸으로 비움
     });
 }
+// class="comment-form"인 폼을 전부 찾아서, 각각에 위 함수로 이벤트를 걸어줌 (지금까지 이 줄이 없어서 서버가 처음 그려준 댓글 폼은 눌러도 아무 반응이 없었음)
+document.querySelectorAll(".comment-form").forEach(attachCommentFormHandler);
+
 // 삭제 버튼 "하나"에 클릭 이벤트를 걸어주는 함수. 기존 버튼이든 새로 만든 버튼이든 이 함수 하나로 재사용함
 function attachDeleteHandler(button) {
     button.addEventListener("click", async () => {

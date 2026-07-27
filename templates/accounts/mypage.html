@@ -17,7 +17,9 @@
     {% if posts %}
     <div class="mypage__grid">
         {% for post in posts %}
-        <img class="mypage__thumbnail" src="{{ post.image.url }}" alt="{{ post.caption }}">
+         <a href="{% url 'posts:detail' post.id %}">
+            <img class="mypage__thumbnail" src="{{ post.image.url }}" alt="{{ post.caption }}">
+        </a>
         {% endfor %}
     </div>
     {% else %}

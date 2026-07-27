@@ -40,6 +40,20 @@ def feed(request):
 
     return render(request, "posts/feed.html", {"posts": posts})
 
+def post_detail(request, post_id):  # URL의 <int:post_id> 부분 값이 post_id 인자로 그대로 들어옴
+    post = get_object_or_404(  # 조건에 맞는 게시물이 없으면 자동으로 404 Not Found 페이지를 보여줌
+        Post.objects.select_related("user").prefetch_related("comments__user").annotate(like_count=Count("likes")),
+        # feed()에서 썼던 것과 똑같은 쿼리: 작성자/댓글작성자/좋아요개수를 미리 다 가져와서 붙여둠
+        pk=post_id,  # Post 테이블에서 기본키(pk)가 post_id와 같은 행 하나를 찾으라는 조건
+    )
+
+    if request.user.is_authenticated:  # feed()와 동일하게, 로그인 여부로 분기
+        post.is_liked = Like.objects.filter(post=post, user=request.user).exists()
+        # 이 게시물에 대해 (post, 현재유저) 조합의 Like가 존재하는지 True/False로 확인
+    else:
+        post.is_liked = False  # 로그인 안 한 사람은 좋아요를 누른 적이 있을 수 없음
+
+    return render(request, "posts/detail.html", {"post": post})  # posts 리스트가 아니라 post 하나만 템플릿에 넘김
 
 class PostListCreateAPIView(generics.ListCreateAPIView):
     queryset = Post.objects.select_related("user").order_by("-created_at")
