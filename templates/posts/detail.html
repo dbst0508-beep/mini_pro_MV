@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}게시물 상세{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/feed.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="feed">
+    <a href="{% url 'posts:feed' %}" class="detail__back">← 피드로 돌아가기</a>
+    {% include "posts/_post_card.html" %}
+</div>
+{% endblock %}
