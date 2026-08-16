@@ -13,7 +13,7 @@ class Post(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user} - {self.created_at:%Y-%m-%d}"
+        return self.caption[:30] if self.caption else f"Post #{self.pk}"
 
 class Comment(models.Model):
     # 이 댓글이 어느 게시물에 달린 것인지 연결 (N:1 관계)

@@ -1,51 +1,32 @@
-{% comment %} 모든 페이지가 공통으로 상속받을 뼈대 {% endcomment %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}패션 SNS{% endblock %}</title>
-    <style>
-        body {
-            margin: 0;
-            padding-top: 50px;     /* 상단 바에 안 가리게 여백 확보 */
-            padding-bottom: 60px;  /* 하단 바에 안 가리게 여백 확보 */
-            font-family: sans-serif;
-        }
-        .top-bar {
-            position: fixed;         /* 스크롤해도 화면에 고정 */
-            top: 0; left: 0; right: 0;
-            display: flex;
-            justify-content: flex-end;  /* 자식 요소(로그인)를 오른쪽 끝으로 밀어냄 */
-            align-items: center;        /* 세로 가운데 정렬 */
-            height: 50px;
-            padding: 0 16px;
-            background: #fff;
-            border-bottom: 1px solid #ddd;
-        }
-        .top-bar a {
-            text-decoration: none;  /* 링크 밑줄 제거 */
-            color: #333;
-            font-weight: bold;
-        }
-        .bottom-nav {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            display: flex;          /* 3개 링크를 가로로 나란히 */
-            background: #fff;
-            border-top: 1px solid #ddd;
-        }
-        .bottom-nav a {
-            flex: 1;                /* 3등분 너비 균등 분배 */
-            text-align: center;
-            padding: 12px 0;
-            text-decoration: none;
-            color: #333;
-        }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <header class="top-bar">
-        <a href="{% url 'accounts:login_page' %}">로그인</a>
+ <header class="top-bar">
+        <a href="{% url 'posts:feed' %}" class="top-bar__brand">
+            <img src="{% static 'images/momvision_logo_v1.png' %}" alt="mom vision" class="top-bar__logo">
+            <span class="top-bar__title">mom vision</span>
+        </a>
+
+        <div class="top-bar__auth">
+            {# 로그인 상태 링크/버튼들을 하나로 묶는 컨테이너 -> top-bar 입장에선 자식이 "로고, 이 div" 딱 2개가 됨 #}
+            {% if user.is_authenticated %}
+                <span>{{ user.username }}님</span>
+                <form method="post" action="{% url 'accounts:logout' %}">
+                    {% csrf_token %}
+                    <button type="submit">로그아웃</button>
+                </form>
+            {% else %}
+                <a href="{% url 'accounts:login_page' %}">로그인</a>
+                <a href="{% url 'accounts:signup_page' %}">회원가입</a>
+            {% endif %}
+        </div>
     </header>
 
     <main>
@@ -57,5 +38,6 @@
         <a href="{% url 'analysis:home' %}">AI 분석</a>
         <a href="{% url 'accounts:mypage' %}">마이페이지</a>
     </nav>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>
