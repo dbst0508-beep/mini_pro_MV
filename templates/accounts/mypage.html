@@ -10,9 +10,20 @@
 {% block content %}
 <div class="mypage">
     <header class="mypage__header">
-        <span class="mypage__username">{{ user.username }}</span>
+        {% if profile_user.profile_image %}
+        <img class="mypage__avatar" src="{{ profile_user.profile_image.url }}" alt="{{ profile_user.username }} 프로필 사진">
+        {% endif %}
+        <span class="mypage__username">{{ profile_user.username }}</span>
         <span class="mypage__post-count">게시물 {{ posts.count }}개</span>
     </header>
+
+    {% if is_own_page %}
+    <form class="mypage__photo-form" action="{% url 'accounts:update_profile_photo' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="profile_image" accept="image/*" required>
+        <button type="submit">프로필 사진 변경</button>
+    </form>
+    {% endif %}
 
     {% if posts %}
     <div class="mypage__grid">

@@ -22,6 +22,11 @@
 .post-card__username {
     font-weight: bold;
     font-size: 14px;
+    color: inherit;
+    text-decoration: none;
+    display: inline-flex;   /* 아바타 이미지와 글자를 가로로 나란히 배치 */
+    align-items: center;
+    gap: 6px;
 }
 
 .post-card__image {
@@ -31,12 +36,13 @@
     object-fit: cover;      /* 비율 유지하며 꽉 채우고, 넘치는 부분은 잘라냄 */
 }
 
-.post-card__actions {
-    display: flex;
-    gap: 16px;
-    padding: 10px 12px;
-    font-size: 14px;
+.post-card__avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
 }
+
 
 .post-card__caption {
     padding: 0 12px 12px;
@@ -141,4 +147,23 @@
     padding: 6px 16px;
     border-radius: 4px;
     cursor: pointer;               /* 클릭 가능하다는 신호 */
+}
+
+.comment-list__item a,
+.post-card__caption a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.comment-list__username {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.comment-list__avatar {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    object-fit: cover;
 }

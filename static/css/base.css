@@ -43,6 +43,20 @@ body {
     gap: 12px;            /* 로그인과 회원가입 사이 간격 */
 }
 
+.top-bar__me {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;   /* <a>로 바뀌면서 생긴 기본 밑줄 제거 */
+    color: inherit;            /* <a>의 기본 파란색 대신 부모 글자색 그대로 */
+}
+
+.top-bar__avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+}
 
 .bottom-nav {
     position: fixed;

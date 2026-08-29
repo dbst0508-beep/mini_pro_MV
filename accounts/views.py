@@ -1,10 +1,11 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from .forms import SignUpForm
 from django.contrib.auth import login,logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required  # 로그인 안 했으면 자동으로 로그인 페이지로 보내주는 데코레이터
 from posts.models import Post  # 다른 앱(posts)의 모델을 가져다 씀 (마이페이지에서 내 게시물을 조회해야 하니까)
+from .models import User
 
 def signup_page(request):  # 회원가입 페이지 뷰
     if request.user.is_authenticated:  # 이미 로그인된 상태라면
@@ -20,11 +21,27 @@ def signup_page(request):  # 회원가입 페이지 뷰
 
     return render(request, "accounts/signup.html", {"form": form})  # POST 실패 시에도 여기로 와서 에러 메시지 포함해 다시 보여줌
 
-@login_required(login_url="accounts:login_page")  # 비로그인이면 이 함수 실행 전에 자동으로 로그인 페이지로 리다이렉트
-def mypage(request):
-    posts = Post.objects.filter(user=request.user).order_by("-created_at")  # 로그인한 본인이 올린 게시물만, 최신순으로 조회
-    return render(request, "accounts/mypage.html", {"posts": posts})
+def mypage(request, username=None):
+    if username is None:  # 인자 없이 들어온 요청 -> "내 마이페이지" 의미
+        if not request.user.is_authenticated:  # 로그인 안 했으면
+            return redirect("accounts:login_page")  # 여기선 데코레이터 대신 직접 체크
+        profile_user = request.user
+    else:  # username이 있는 요청 -> "특정 유저의 마이페이지" 의미, 로그인 여부 무관
+        profile_user = get_object_or_404(User, username=username)  # 없는 유저면 404
 
+    is_own_page = request.user.is_authenticated and profile_user == request.user  # 본인 페이지인지 여부
+    posts = Post.objects.filter(user=profile_user).order_by("-created_at")
+    return render(request, "accounts/mypage.html", {
+        "profile_user": profile_user,
+        "posts": posts,
+        "is_own_page": is_own_page,
+    })
+@login_required(login_url="accounts:login_page")
+@require_POST
+def update_profile_photo(request):
+    request.user.profile_image = request.FILES["profile_image"]
+    request.user.save()
+    return redirect("accounts:mypage")
 
 def login_page(request):  # 로그인 페이지 뷰
     if request.user.is_authenticated:  # 이미 로그인된 상태라면

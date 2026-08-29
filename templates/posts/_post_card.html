@@ -1,7 +1,12 @@
 <article class="post-card">
     <header class="post-card__header">
-        <span class="post-card__username">{{ post.user }}</span>
-    </header>
+    <a href="{% url 'accounts:mypage' post.user.username %}" class="post-card__username">
+        {% if post.user.profile_image %}
+        <img class="post-card__avatar" src="{{ post.user.profile_image.url }}" alt="{{ post.user.username }}">
+        {% endif %}
+        {{ post.user }}
+    </a>
+</header>
     <img class="post-card__image" src="{{ post.image.url }}" alt="{{ post.caption }}">
     <div class="post-card__actions">
         <button
@@ -14,7 +19,14 @@
         <ul class="comment-list">
             {% for comment in post.comments.all %}
              <li class="comment-list__item" data-comment-id="{{ comment.id }}">
-                <strong>{{ comment.user }}</strong>
+                <strong>
+    <a href="{% url 'accounts:mypage' comment.user.username %}" class="comment-list__username">
+        {% if comment.user.profile_image %}
+        <img class="comment-list__avatar" src="{{ comment.user.profile_image.url }}" alt="{{ comment.user.username }}">
+        {% endif %}
+        {{ comment.user }}
+    </a>
+                </strong>
                 <span class="comment-list__content">{{ comment.content }}</span>
                 {% if comment.user == user %}
                 <button class="comment-edit-button">수정</button>
@@ -29,5 +41,5 @@
             <button type="submit" class="comment-form__submit">게시</button>
         </form>
     </div>
-    <p class="post-card__caption"><strong>{{ post.user }}</strong> {{ post.caption }}</p>
+    <p class="post-card__caption"><strong><a href="{% url 'accounts:mypage' post.user.username %}">{{ post.user }}</a></strong> {{ post.caption }}</p>
 </article>
