@@ -66,9 +66,17 @@ function attachCommentFormHandler(form) {
         item.className = "comment-list__item";                 // CSS가 먹도록 클래스 이름을 붙여줌
         item.dataset.commentId = comment.id;                    // 서버 렌더링 버전과 동일하게 댓글 id를 심어둠 (수정/삭제 버튼이 찾을 수 있도록)
 
-        // 서버가 렌더링하는 것과 똑같은 구조로 내부를 채움: 작성자, 내용, 수정/삭제 버튼
+ // 댓글 작성자는 항상 "나 자신"이므로, body에 심어둔 내 아바타 URL을 그대로 씀
+        const avatarUrl = document.body.dataset.currentAvatarUrl;
+        const avatarImg = avatarUrl ? `<img class="comment-list__avatar" src="${avatarUrl}" alt="${comment.user}">` : "";
+
+        // 서버가 렌더링하는 것과 똑같은 구조로 내부를 채움: 작성자(아바타+링크),
+
+        // 서버가 렌더링하는 것과 똑같은 구조로 내부를 채움: 작성자(아바타+링크), 내용, 수정/삭제 버튼
         item.innerHTML = `
-            <strong>${comment.user}</strong>
+            <strong>
+                <a href="/accounts/mypage/${comment.user}/" class="comment-list__username">${avatarImg}${comment.user}</a>
+            </strong>
             <span class="comment-list__content">${comment.content}</span>
             <button class="comment-edit-button">수정</button>
             <button class="comment-delete-button">삭제</button>

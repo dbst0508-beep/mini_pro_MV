@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body data-current-avatar-url="{% if user.is_authenticated and user.profile_image %}{{ user.profile_image.url }}{% endif %}">
  <header class="top-bar">
         <a href="{% url 'posts:feed' %}" class="top-bar__brand">
             <img src="{% static 'images/momvision_logo_v1.png' %}" alt="mom vision" class="top-bar__logo">
@@ -17,7 +17,12 @@
         <div class="top-bar__auth">
             {# 로그인 상태 링크/버튼들을 하나로 묶는 컨테이너 -> top-bar 입장에선 자식이 "로고, 이 div" 딱 2개가 됨 #}
             {% if user.is_authenticated %}
-                <span>{{ user.username }}님</span>
+                <a href="{% url 'accounts:mypage' %}" class="top-bar__me">
+    {% if user.profile_image %}
+    <img class="top-bar__avatar" src="{{ user.profile_image.url }}" alt="{{ user.username }}">
+    {% endif %}
+    <span>{{ user.username }}님</span>
+</a>
                 <form method="post" action="{% url 'accounts:logout' %}">
                     {% csrf_token %}
                     <button type="submit">로그아웃</button>

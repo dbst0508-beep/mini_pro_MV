@@ -6,16 +6,24 @@
 
 .mypage__header {
     display: flex;
-    justify-content: space-between;  /* 유저명은 왼쪽, 게시물 개수는 오른쪽 */
     align-items: center;
+    gap: 10px;                          /* 아바타-유저명 사이 간격 */
     padding-bottom: 16px;
     border-bottom: 1px solid #dbdbdb;  /* 헤더와 그리드 사이 구분선 */
     margin-bottom: 16px;
 }
 
+.mypage__avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;    /* 정사각형 이미지를 원으로 */
+    object-fit: cover;      /* 원본 비율 유지하며 원 안을 꽉 채움 */
+}
+
 .mypage__username {
     font-weight: bold;
     font-size: 18px;
+    margin-right: auto;    /* 이 여백이 남는 공간을 다 차지해서 post-count를 오른쪽 끝으로 밀어냄 */
 }
 
 .mypage__post-count {
