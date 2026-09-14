@@ -1,169 +1,181 @@
 .feed {
-    max-width: 470px;   /* 인스타그램 피드 폭과 비슷하게 제한 */
-    margin: 0 auto;      /* 가운데 정렬 */
-    padding: 16px;
+    max-width: 470px;    /* 기존과 동일: 인스타그램 피드 폭과 비슷하게 제한 */
+    margin: 0 auto;       /* 기존과 동일: 가운데 정렬 */
+    padding: var(--space-md); /* 기존 16px를 변수로 교체 */
 }
 
 .post-card {
-    background: #fff;
-    border: 1px solid #dbdbdb;
-    border-radius: 8px;   /* 모서리 둥글게 */
-    margin-bottom: 24px;  /* 카드 사이 간격 */
-    overflow: hidden;      /* 이미지가 둥근 모서리 밖으로 안 튀어나오게 */
+    background: var(--color-surface);           /* 기존 #fff를 변수로 교체 */
+    border: 1px solid var(--color-border);       /* 기존 #dbdbdb를 변수로 교체 */
+    border-radius: var(--radius-md);             /* 기존 8px보다 더 둥글게(12px) 해서 모던한 느낌 */
+    box-shadow: var(--shadow-sm);                /* 새로 추가: 상단바와 톤을 맞추는 은은한 그림자 */
+    margin-bottom: var(--space-lg);              /* 기존 24px를 변수로 교체 */
+    overflow: hidden;                             /* 기존과 동일 */
 }
 
 .post-card__header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
+    display: flex;                 /* 기존과 동일 */
+    align-items: center;           /* 기존과 동일 */
+    gap: var(--space-sm);          /* 기존 8px를 변수로 교체 */
+    padding: 10px var(--space-md); /* 좌우만 변수로 교체, 위아래는 기존값 유지 */
 }
 
 .post-card__username {
-    font-weight: bold;
-    font-size: 14px;
-    color: inherit;
-    text-decoration: none;
-    display: inline-flex;   /* 아바타 이미지와 글자를 가로로 나란히 배치 */
-    align-items: center;
-    gap: 6px;
+    font-weight: bold;      /* 기존과 동일 */
+    font-size: 14px;        /* 기존과 동일 */
+    color: inherit;         /* 기존과 동일 */
+    text-decoration: none;  /* 기존과 동일 */
+    display: inline-flex;   /* 기존과 동일 */
+    align-items: center;    /* 기존과 동일 */
+    gap: 6px;                /* 기존과 동일 */
 }
 
 .post-card__image {
-    width: 100%;
-    display: block;
-    aspect-ratio: 1 / 1;   /* 항상 정사각형 비율 유지 */
-    object-fit: cover;      /* 비율 유지하며 꽉 채우고, 넘치는 부분은 잘라냄 */
+    width: 100%;             /* 기존과 동일 */
+    display: block;          /* 기존과 동일 */
+    aspect-ratio: 1 / 1;     /* 기존과 동일 */
+    object-fit: cover;        /* 기존과 동일 */
 }
 
 .post-card__avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    object-fit: cover;
+    width: 28px;           /* 기존과 동일 */
+    height: 28px;          /* 기존과 동일 */
+    border-radius: 50%;    /* 기존과 동일 */
+    object-fit: cover;     /* 기존과 동일 */
 }
 
 
 .post-card__caption {
-    padding: 0 12px 12px;
-    font-size: 14px;
-    margin: 0;
+    padding: 0 var(--space-md) var(--space-md); /* 기존 12px를 변수로 교체 */
+    font-size: 14px;                              /* 기존과 동일 */
+    margin: 0;                                      /* 기존과 동일 */
 }
 
 .feed__empty {
-    text-align: center;
-    color: #999;
-    padding: 40px 0;
+    text-align: center;             /* 기존과 동일 */
+    color: var(--color-text-muted); /* 기존 #999를 변수로 교체 */
+    padding: 40px 0;                 /* 기존과 동일 */
 }
 
 .like-button {
-    border: none;
-    background: none;
-    cursor: pointer;   /* 마우스 올리면 손가락 커서로 바뀜 (클릭 가능하다는 신호) */
-    font-size: 14px;
-    padding: 0;
-    color: #333;
+    border: none;                    /* 기존과 동일 */
+    background: none;                /* 기존과 동일 */
+    cursor: pointer;                  /* 기존과 동일 */
+    font-size: 14px;                   /* 기존과 동일 */
+    padding: 0;                        /* 기존과 동일 */
+    color: var(--color-text-muted);    /* 기존 #333을 변수로 교체 */
+    transition: color .15s ease;        /* 새로 추가: hover 시 부드럽게 */
+}
+
+.like-button:hover {
+    color: var(--color-accent); /* 새로 추가: hover 시 포인트 컬러로 살짝 반응 */
 }
 
 .like-button.liked {
-    color: #ed4956;    /* 좋아요 눌렀을 때 빨간색 */
-    font-weight: bold;
+    color: #ed4956;    /* 기존과 동일: "좋아요=빨간색"은 널리 쓰이는 관용 표현이라 브랜드 컬러로 안 바꿈 */
+    font-weight: bold;  /* 기존과 동일 */
 }
 
 .comment-section {
-    padding: 0 12px 12px;   /* post-card__caption과 좌우 여백 통일 */
+    padding: 0 var(--space-md) var(--space-md); /* 기존 12px를 변수로 교체 */
 }
 
 .comment-list {
-    list-style: none;   /* <li> 앞에 자동으로 붙는 점(•) 제거 */
-    margin: 0;
-    padding: 0;
+    list-style: none;  /* 기존과 동일 */
+    margin: 0;          /* 기존과 동일 */
+    padding: 0;         /* 기존과 동일 */
 }
 
 .comment-list__item {
-    display: flex;            /* 작성자/내용/버튼을 가로로 나란히 배치 */
-    align-items: baseline;    /* 글자들의 밑줄 기준선을 맞춰서 자연스럽게 정렬 */
-    gap: 6px;                 /* 요소 사이 살짝 간격 */
-    font-size: 14px;
-    margin-bottom: 4px;   /* 댓글 사이 간격 */
+    display: flex;            /* 기존과 동일 */
+    align-items: baseline;    /* 기존과 동일 */
+    gap: 6px;                  /* 기존과 동일 */
+    font-size: 14px;            /* 기존과 동일 */
+    margin-bottom: var(--space-xs); /* 기존 4px를 변수로 교체 */
 }
 
 .comment-form {
-    display: flex;         /* 입력창과 버튼을 가로로 나란히 배치 */
-    gap: 8px;
-    margin-top: 8px;
+    display: flex;          /* 기존과 동일 */
+    gap: var(--space-sm);    /* 기존 8px를 변수로 교체 */
+    margin-top: var(--space-sm); /* 기존 8px를 변수로 교체 */
 }
 
 .comment-form__input {
-    flex: 1;                /* 남는 공간을 입력창이 다 차지하도록 */
-    border: none;
-    border-top: 1px solid #efefef;   /* 위에 얇은 구분선 */
-    padding: 8px 0;
-    font-size: 14px;
-    outline: none;           /* 클릭했을 때 브라우저 기본 파란 테두리 제거 */
+    flex: 1;                                   /* 기존과 동일 */
+    border: none;                               /* 기존과 동일 */
+    border-top: 1px solid var(--color-border);  /* 기존 #efefef를 변수로 교체 */
+    padding: var(--space-sm) 0;                  /* 기존 8px를 변수로 교체 */
+    font-size: 14px;                              /* 기존과 동일 */
+    outline: none;                                /* 기존과 동일 */
 }
 
 .comment-form__submit {
-    border: none;
-    background: none;
-    color: #0095f6;           /* 인스타그램 느낌의 파란 버튼 텍스트 */
-    font-weight: bold;
-    cursor: pointer;
+    border: none;               /* 기존과 동일 */
+    background: none;           /* 기존과 동일 */
+    color: var(--color-accent); /* 기존 인스타그램 파란색(#0095f6)을 포인트 컬러로 교체 */
+    font-weight: bold;           /* 기존과 동일 */
+    cursor: pointer;              /* 기존과 동일 */
 }
 
 .comment-edit-button,
 .comment-delete-button {
-    border: none;
-    background: none;
-    padding: 0;
-    font-size: 12px;    /* 댓글 본문(14px)보다 작게 */
-    color: #8e8e8e;     /* 옅은 회색 */
-    cursor: pointer;
+    border: none;                    /* 기존과 동일 */
+    background: none;                /* 기존과 동일 */
+    padding: 0;                       /* 기존과 동일 */
+    font-size: 12px;                   /* 기존과 동일 */
+    color: var(--color-text-muted);    /* 기존 #8e8e8e를 변수로 교체 (거의 같은 톤) */
+    cursor: pointer;                    /* 기존과 동일 */
 }
 .post-upload-form {
-    background: #fff;              /* post-card랑 통일된 흰 배경 */
-    border: 1px solid #dbdbdb;     /* post-card와 동일한 테두리 색 */
-    border-radius: 8px;            /* post-card와 동일한 둥근 모서리 */
-    margin-bottom: 24px;           /* 아래 게시물 카드들과 간격 (post-card의 margin-bottom과 동일값) */
-    padding: 12px;                 /* 안쪽 여백 */
-    display: flex;                 /* 파일선택/캡션/버튼을 세로로 쌓기 위해 flex 사용 */
-    flex-direction: column;        /* 가로가 아니라 세로로 나열 */
-    gap: 8px;                      /* 요소 사이 간격 */
+    background: var(--color-surface);      /* 기존 #fff를 변수로 교체 */
+    border: 1px solid var(--color-border);  /* 기존 #dbdbdb를 변수로 교체 */
+    border-radius: var(--radius-md);         /* 기존 8px를 post-card와 동일하게 12px로 교체 */
+    box-shadow: var(--shadow-sm);            /* 새로 추가: post-card와 톤 통일 */
+    margin-bottom: var(--space-lg);           /* 기존 24px를 변수로 교체 */
+    padding: var(--space-md);                  /* 기존 12px를 변수로 교체 */
+    display: flex;                              /* 기존과 동일 */
+    flex-direction: column;                      /* 기존과 동일 */
+    gap: var(--space-sm);                         /* 기존 8px를 변수로 교체 */
 }
 
 .post-upload-form__caption {
-    border: 1px solid #dbdbdb;     /* 입력창 티가 나도록 얇은 테두리 */
-    border-radius: 4px;            /* 살짝 둥글게 */
-    padding: 8px;                  /* 입력창 안쪽 여백 */
-    font-size: 14px;               /* 다른 텍스트들과 크기 통일 */
+    border: 1px solid var(--color-border); /* 기존 #dbdbdb를 변수로 교체 */
+    border-radius: var(--radius-sm);        /* 기존 4px를 변수로 교체 */
+    padding: var(--space-sm);                /* 기존 8px를 변수로 교체 */
+    font-size: 14px;                          /* 기존과 동일 */
 }
 
 .post-upload-form__submit {
-    align-self: flex-end;          /* 부모(column) 안에서 이 버튼만 오른쪽 정렬 */
-    border: none;
-    background: #0095f6;           /* comment-form__submit과 같은 파란 톤이지만 배경째로 채워서 "주요 버튼" 느낌 */
-    color: #fff;
-    font-weight: bold;
-    padding: 6px 16px;
-    border-radius: 4px;
-    cursor: pointer;               /* 클릭 가능하다는 신호 */
+    align-self: flex-end;              /* 기존과 동일 */
+    border: none;                       /* 기존과 동일 */
+    background: var(--color-accent);    /* 기존 인스타그램 파란색을 포인트 컬러로 교체 */
+    color: #fff;                         /* 기존과 동일 */
+    font-weight: bold;                    /* 기존과 동일 */
+    padding: var(--space-sm) var(--space-md); /* 기존 6px 16px를 변수로 교체 */
+    border-radius: var(--radius-sm);           /* 기존 4px를 변수로 교체 */
+    cursor: pointer;                             /* 기존과 동일 */
+    transition: background .15s ease;             /* 새로 추가: hover 부드럽게 */
+}
+
+.post-upload-form__submit:hover {
+    background: var(--color-accent-hover); /* 새로 추가: hover 시 더 진한 톤 */
 }
 
 .comment-list__item a,
 .post-card__caption a {
-    color: inherit;
-    text-decoration: none;
+    color: inherit;          /* 기존과 동일 */
+    text-decoration: none;   /* 기존과 동일 */
 }
 
 .comment-list__username {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+    display: inline-flex;   /* 기존과 동일 */
+    align-items: center;     /* 기존과 동일 */
+    gap: 4px;                  /* 기존과 동일 */
 }
 
 .comment-list__avatar {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    object-fit: cover;
+    width: 18px;           /* 기존과 동일 */
+    height: 18px;          /* 기존과 동일 */
+    border-radius: 50%;    /* 기존과 동일 */
+    object-fit: cover;     /* 기존과 동일 */
 }
