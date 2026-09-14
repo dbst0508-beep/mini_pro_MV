@@ -1,75 +1,164 @@
-/* 기존 base.html <style> 안에 있던 내용을 그대로 옮김 */
+/* ===== 디자인 시스템: 색상/여백/둥근모서리 등을 변수로 모아둠 ===== */
+:root {
+    --color-bg: #fafafa;                          /* 페이지 전체 배경 (기존값 유지) */
+    --color-surface: #ffffff;                      /* 카드/바 등 흰 배경 */
+    --color-border: #e9e9ec;                       /* 얇은 경계선 색 (기존 #ddd보다 부드럽게) */
+    --color-text: #1a1a1a;                          /* 기본 글자색 */
+    --color-text-muted: #767676;                    /* 보조 글자색 (하단 네비 기본 상태 등) */
+    --color-navy: #0a1f44;                          /* 로고와 맞춘 브랜드 남색 */
+    --color-accent: #7c6ff0;                        /* 포인트 컬러 (라벤더/보라) */
+    --color-accent-hover: #6355d6;                  /* 포인트 컬러 hover 시 더 진한 톤 */
+    --color-accent-soft: rgba(124, 111, 240, 0.12); /* 포인트 컬러 옅은 배경용 (하단 네비 hover 등) */
+    --radius-sm: 6px;                               /* 버튼/네비 등 작은 둥근모서리 */
+    --radius-md: 12px;                              /* 카드 등 큰 둥근모서리 (다음 단계에서 사용 예정) */
+    --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.06);      /* 상단바 살짝 띄우는 그림자 */
+    --space-xs: 4px;                                /* 여백 단위: 아주 작게 */
+    --space-sm: 8px;                                /* 여백 단위: 작게 */
+    --space-md: 16px;                                /* 여백 단위: 보통 */
+    --space-lg: 24px;                                /* 여백 단위: 크게 */
+    --content-max-width: 600px;                      /* 데스크탑에서 콘텐츠 최대 폭 (앱처럼 중앙 정렬) */
+    --font-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif; /* 기본 폰트 스택 */
+}
+
 body {
-    margin: 0;
-    padding-top: 50px;     /* 상단 바에 안 가리게 여백 확보 */
-    padding-bottom: 60px;  /* 하단 바에 안 가리게 여백 확보 */
-    font-family: sans-serif;
-    background: #fafafa;   /* 카드가 배경과 구분되게 살짝 회색 배경 추가 */
+    margin: 0;                          /* 브라우저 기본 여백 제거 (기존과 동일) */
+    padding-top: 50px;                  /* 상단 바에 안 가리게 여백 확보 (기존과 동일) */
+    padding-bottom: 60px;               /* 하단 바에 안 가리게 여백 확보 (기존과 동일) */
+    font-family: var(--font-base);      /* 기존 sans-serif 대신 시스템 폰트 스택 사용 */
+    color: var(--color-text);            /* 기본 글자색을 변수로 지정 */
+    background: var(--color-bg);         /* 기존 값을 변수로만 교체 */
+}
+
+main {
+    max-width: var(--content-max-width);           /* 콘텐츠 폭을 600px로 제한 */
+    margin: 0 auto;                                 /* 가운데 정렬 */
+    min-height: calc(100vh - 110px);                /* 상단바(50)+하단바(60) 뺀 화면 높이만큼 배경 채움 */
+    background: var(--color-surface);                /* 데스크탑에서 옆으로 회색 배경이 보이도록 흰 카드처럼 */
 }
 
 .top-bar {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    display: flex;
-    justify-content: space-between;  /* 기존 flex-end에서 변경: 로고는 왼쪽, 로그인은 오른쪽 */
-    align-items: center;
-    height: 50px;
-    padding: 0 16px;
-    background: #fff;
-    border-bottom: 1px solid #ddd;
+    position: fixed;                     /* 기존과 동일: 스크롤해도 상단 고정 */
+    top: 0; left: 0; right: 0;           /* 기존과 동일: 화면 폭 전체에 걸침 */
+    max-width: var(--content-max-width); /* 안쪽 내용은 600px로 제한 */
+    margin: 0 auto;                       /* 가운데 정렬 (위 left/right:0과 함께 작동) */
+    display: flex;                        /* 기존과 동일: 가로 배치 */
+    justify-content: space-between;       /* 기존과 동일: 로고 왼쪽, 로그인 오른쪽 */
+    align-items: center;                  /* 기존과 동일: 세로 중앙 정렬 */
+    height: 50px;                         /* 기존과 동일 */
+    padding: 0 var(--space-md);           /* 기존 16px를 변수로 교체 */
+    background: var(--color-surface);      /* 기존 #fff를 변수로 교체 */
+    box-shadow: var(--shadow-sm);          /* 기존 border-bottom 대신 살짝 띄우는 그림자로 더 모던하게 */
 }
 
 .top-bar__brand {
-    display: flex;
-    align-items: center;
-    gap: 6px;          /* 로고와 글자 사이 간격 */
-    text-decoration: none;
-    color: #0a1f44;    /* 로고의 남색 톤과 맞춤 */
+    display: flex;               /* 기존과 동일 */
+    align-items: center;         /* 기존과 동일 */
+    gap: var(--space-sm);        /* 기존 6px을 8px 변수로 살짝 조정 */
+    text-decoration: none;       /* 기존과 동일 */
+    color: var(--color-navy);     /* 기존 하드코딩 색을 변수로 교체 */
+    transition: color .15s ease; /* 새로 추가: hover 시 색 변화가 부드럽게 */
+}
+
+.top-bar__brand:hover {
+    color: var(--color-accent);  /* 새로 추가: 로고 hover 시 포인트 컬러로 */
 }
 
 .top-bar__logo {
-    height: 24px;      /* 상단바 높이(50px)에 맞춰 아이콘 크기 제한 */
-    width: auto;       /* 비율 유지하며 높이 기준으로 너비 자동 계산 */
+    height: 24px;    /* 기존과 동일 */
+    width: auto;     /* 기존과 동일 */
 }
 
 .top-bar__title {
-    font-weight: bold;
-    font-size: 16px;
+    font-weight: bold; /* 기존과 동일 */
+    font-size: 16px;   /* 기존과 동일 */
 }
 
 .top-bar__auth {
-    display: flex;       /* 안의 로그인/회원가입(또는 이름/로그아웃)을 가로로 나란히 배치 */
-    align-items: center; /* 세로 중앙 정렬, 버튼/텍스트 높이 맞춤 */
-    gap: 12px;            /* 로그인과 회원가입 사이 간격 */
+    display: flex;          /* 기존과 동일 */
+    align-items: center;    /* 기존과 동일 */
+    gap: var(--space-md);   /* 기존 12px을 16px 변수로 살짝 조정 */
+}
+
+.top-bar__auth a {
+    color: var(--color-text-muted); /* 새로 추가: 로그인/회원가입 링크 기본 색을 은은하게 */
+    text-decoration: none;           /* 새로 추가: 밑줄 제거 */
+    font-size: 14px;                  /* 새로 추가: 살짝 작게 */
+    transition: color .15s ease;      /* 새로 추가: hover 부드럽게 */
+}
+
+.top-bar__auth a:hover {
+    color: var(--color-accent); /* 새로 추가: hover 시 포인트 컬러 */
 }
 
 .top-bar__me {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    text-decoration: none;   /* <a>로 바뀌면서 생긴 기본 밑줄 제거 */
-    color: inherit;            /* <a>의 기본 파란색 대신 부모 글자색 그대로 */
+    display: flex;              /* 기존과 동일 */
+    align-items: center;        /* 기존과 동일 */
+    gap: var(--space-xs);       /* 기존 6px을 4px 변수로 교체 */
+    text-decoration: none;      /* 기존과 동일 */
+    color: inherit;             /* 기존과 동일 */
 }
 
 .top-bar__avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    object-fit: cover;
+    width: 28px;           /* 기존과 동일 */
+    height: 28px;          /* 기존과 동일 */
+    border-radius: 50%;    /* 기존과 동일 */
+    object-fit: cover;     /* 기존과 동일 */
+}
+
+/* ===== 상단바/하단바에서 공통으로 쓸 버튼 스타일 (다음 단계에서 다른 페이지에도 재사용) ===== */
+.btn {
+    display: inline-block;           /* 버튼 형태 기본값 */
+    border: none;                     /* 테두리 없음이 기본 */
+    border-radius: var(--radius-sm);  /* 둥근 모서리 통일 */
+    padding: 8px 14px;                /* 안쪽 여백 통일 */
+    font-size: 14px;                   /* 글자 크기 통일 */
+    font-weight: 600;                  /* 살짝 굵게 */
+    cursor: pointer;                   /* 클릭 가능 표시 */
+    transition: background .15s ease, color .15s ease; /* 상태 변화 부드럽게 */
+}
+
+.btn--primary {
+    background: var(--color-accent); /* 포인트 컬러로 채운 버튼 (다음 단계 게시물 등록/좋아요 등에서 사용 예정) */
+    color: #fff;                      /* 흰 글자 */
+}
+
+.btn--primary:hover {
+    background: var(--color-accent-hover); /* hover 시 더 진한 톤 */
+}
+
+.btn--ghost {
+    background: transparent;                /* 배경 없이 테두리만 있는 보조 버튼 (로그아웃 등) */
+    color: var(--color-text-muted);         /* 은은한 글자색 */
+    border: 1px solid var(--color-border);  /* 옅은 테두리 */
+}
+
+.btn--ghost:hover {
+    color: var(--color-accent);        /* hover 시 포인트 컬러 글자 */
+    border-color: var(--color-accent); /* hover 시 포인트 컬러 테두리 */
 }
 
 .bottom-nav {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    display: flex;
-    background: #fff;
-    border-top: 1px solid #ddd;
+    position: fixed;                     /* 기존과 동일 */
+    bottom: 0; left: 0; right: 0;        /* 기존과 동일 */
+    max-width: var(--content-max-width); /* 상단바와 동일하게 폭 제한 */
+    margin: 0 auto;                       /* 가운데 정렬 */
+    display: flex;                        /* 기존과 동일 */
+    background: var(--color-surface);      /* 기존 #fff를 변수로 교체 */
+    border-top: 1px solid var(--color-border); /* 기존 #ddd를 부드러운 색 변수로 교체 */
 }
 
 .bottom-nav a {
-    flex: 1;
-    text-align: center;
-    padding: 12px 0;
-    text-decoration: none;
-    color: #333;
+    flex: 1;                          /* 기존과 동일 */
+    text-align: center;               /* 기존과 동일 */
+    margin: 4px;                       /* 새로 추가: hover 시 알약(pill) 모양이 보이게 여백 확보 */
+    padding: 8px 0;                    /* 기존 12px 0에서 살짝 줄임 (margin 추가한 만큼 균형 조정) */
+    border-radius: var(--radius-sm);   /* 새로 추가: hover 배경이 둥글게 */
+    text-decoration: none;             /* 기존과 동일 */
+    color: var(--color-text-muted);    /* 기존 #333 대신 은은한 회색으로 변경 */
+    transition: color .15s ease, background .15s ease; /* 새로 추가: 상태 변화 부드럽게 */
+}
+
+.bottom-nav a:hover {
+    color: var(--color-accent);       /* 새로 추가: hover 시 포인트 컬러 글자 */
+    background: var(--color-accent-soft); /* 새로 추가: hover 시 옅은 포인트 컬러 배경 */
 }
