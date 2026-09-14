@@ -21,7 +21,7 @@
     <form class="mypage__photo-form" action="{% url 'accounts:update_profile_photo' %}" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="file" name="profile_image" accept="image/*" required>
-        <button type="submit">프로필 사진 변경</button>
+         <button type="submit" class="btn btn--primary">프로필 사진 변경</button>
     </form>
     {% endif %}
 
