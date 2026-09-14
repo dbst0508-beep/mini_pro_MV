@@ -126,6 +126,12 @@ main {
     background: var(--color-accent-hover); /* hover 시 더 진한 톤 */
 }
 
+.btn--block {
+    display: block;   /* 새로 추가: 버튼을 폼 너비만큼 꽉 채움 (로그인/회원가입 제출 버튼용) */
+    width: 100%;       /* 새로 추가: 부모(폼) 너비에 맞춤 */
+    text-align: center; /* 새로 추가: 버튼 안 글자를 가운데 정렬 */
+}
+
 .btn--ghost {
     background: transparent;                /* 배경 없이 테두리만 있는 보조 버튼 (로그아웃 등) */
     color: var(--color-text-muted);         /* 은은한 글자색 */
