@@ -179,3 +179,18 @@
     border-radius: 50%;    /* 기존과 동일 */
     object-fit: cover;     /* 기존과 동일 */
 }
+
+.detail__back {
+    display: inline-flex;              /* 화살표와 글자를 가로로 나란히 배치 */
+    align-items: center;                /* 세로 중앙 정렬 */
+    gap: 4px;                            /* 화살표-글자 사이 간격 */
+    color: var(--color-text-muted);       /* 브라우저 기본 파란색 대신 은은한 회색 */
+    text-decoration: none;                 /* 밑줄 제거 */
+    font-size: 14px;                        /* 살짝 작게 */
+    margin-bottom: var(--space-md);          /* 아래 게시물 카드와의 간격 */
+    transition: color .15s ease;              /* hover 부드럽게 */
+}
+
+.detail__back:hover {
+    color: var(--color-accent); /* hover 시 포인트 컬러 */
+}
