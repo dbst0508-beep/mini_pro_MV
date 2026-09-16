@@ -20,7 +20,7 @@ accounts/       # 커스텀 유저 모델, 마이페이지/로그인 화면
 posts/          # 게시물, 댓글, 좋아요 (모델 + DRF API)
 analysis/       # 이미지 스타일 분석 결과 (FastAPI 콜백 연동 예정)
 templates/      # 서버 렌더링 템플릿 (feed, mypage, login, analysis)
-static/         # CSS, JS, 이미지
+static/         #  CSS(디자인 시스템 변수 기반), JS, 이미지
 media/          # 업로드된 게시물 이미지
 ```
 
@@ -51,9 +51,17 @@ media/          # 업로드된 게시물 이미지
 - `Analysis`: 게시물에 대한 스타일 분석 요청/상태(`대기중`/`분석중`/`완료`/`실패`) 관리, FastAPI 콜백 검증용 토큰 보유
 - `DetectedItem`: 분석으로 검출된 의류 아이템(카테고리, 바운딩 박스, 쇼핑 검색 링크)
 - `StyleScore`: 스타일별 비율 점수
-- `/analysis/` : 분석 홈 페이지 (뼈대만 존재)
+- `/analysis/` : 분석 홈 페이지 (디자인 적용 완료, 실제 분석 기능은 미구현)
+
 
 ## 실행 방법
+## 디자인 시스템
+
+- `static/css/base.css`의 `:root`에 색상/여백/둥근모서리/그림자를 CSS 변수로 정의하고, 모든 페이지가 이 변수를공유합니다.
+  - 포인트 컬러: 라벤더/보라 계열 (`--color-accent`), 기존 인스타그램풍 파란색에서 교체
+  - 버튼: `.btn--primary`(채워진 버튼) / `.btn--ghost`(테두리만 있는 보조 버튼) 두 종류로 통일
+- 적용된 페이지: 공통 상/하단 바, 피드, 마이페이지, 게시글 상세, 로그인/회원가입, AI 분석(플레이스홀더)
+- 페이지별 CSS는 `static/css/`에 파일 단위로 분리 (`feed.css`, `mypage.css`, `auth.css`, `analysis.css`)
 
 ```bash
 uv sync
