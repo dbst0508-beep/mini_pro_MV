@@ -1,0 +1,68 @@
+.auth-page {
+    max-width: 360px;              /* 로그인/회원가입은 좁은 카드 형태가 자연스러움 */
+    margin: var(--space-lg) auto;   /* 위아래 여백 + 가운데 정렬 */
+}
+
+.auth-page__title {
+    font-size: 22px;               /* 페이지 제목 크기 */
+    text-align: center;             /* 가운데 정렬 */
+    color: var(--color-navy);        /* 브랜드 남색으로 강조 */
+    margin-bottom: var(--space-lg);   /* 폼과의 간격 */
+}
+
+.auth-form {
+    display: flex;              /* 필드들을 세로로 쌓기 위해 flex 사용 */
+    flex-direction: column;      /* 세로 방향 */
+    gap: var(--space-md);         /* 필드(라벨+입력창) 사이 간격 */
+    background: var(--color-surface);      /* 흰 카드 배경 */
+    border: 1px solid var(--color-border);  /* 옅은 테두리 */
+    border-radius: var(--radius-md);         /* 둥근 모서리 */
+    box-shadow: var(--shadow-sm);             /* 다른 카드들과 톤 통일 */
+    padding: var(--space-lg);                  /* 안쪽 여백 */
+}
+
+.auth-form p {
+    display: flex;          /* Django가 자동 생성하는 <p>(라벨+입력창 묶음)를 세로로 배치 */
+    flex-direction: column;  /* 라벨이 입력창 위에 오도록 */
+    gap: var(--space-xs);     /* 라벨-입력창 사이 살짝 간격 */
+    margin: 0;                 /* 기본 <p> 여백 제거 (부모 .auth-form의 gap으로 간격 대체) */
+}
+
+.auth-form label {
+    font-size: 13px;                  /* 입력창보다 작게 */
+    font-weight: 600;                  /* 살짝 굵게 */
+    color: var(--color-text-muted);     /* 은은한 회색 */
+}
+
+.auth-form input {
+    padding: 10px 12px;                     /* 입력창 안쪽 여백 */
+    border: 1px solid var(--color-border);   /* 옅은 테두리 */
+    border-radius: var(--radius-sm);          /* 둥근 모서리 */
+    font-size: 14px;                            /* 글자 크기 */
+    outline: none;                               /* 클릭 시 브라우저 기본 파란 테두리 제거 */
+    transition: border-color .15s ease;           /* 포커스 시 부드럽게 */
+}
+
+.auth-form input:focus {
+    border-color: var(--color-accent); /* 포커스 시 포인트 컬러 테두리로 강조 */
+}
+
+.auth-form .errorlist {
+    list-style: none;   /* Django가 자동 생성하는 에러 <ul>의 점(•) 제거 */
+    margin: 0;            /* 기본 여백 제거 */
+    padding: 0;            /* 기본 여백 제거 */
+    color: #ed4956;         /* like-button.liked와 동일한 "경고" 빨간색 재사용 */
+    font-size: 13px;         /* 살짝 작게 */
+}
+
+.auth-page__footer {
+    text-align: center;             /* 가운데 정렬 */
+    margin-top: var(--space-md);     /* 폼과의 간격 */
+    font-size: 14px;                  /* 살짝 작게 */
+    color: var(--color-text-muted);    /* 은은한 회색 */
+}
+
+.auth-page__footer a {
+    color: var(--color-accent);  /* 링크는 포인트 컬러로 */
+    text-decoration: none;        /* 밑줄 제거 */
+}
