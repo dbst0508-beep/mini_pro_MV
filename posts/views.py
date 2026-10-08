@@ -47,13 +47,15 @@ def post_detail(request, post_id):  # URL의 <int:post_id> 부분 값이 post_id
         pk=post_id,  # Post 테이블에서 기본키(pk)가 post_id와 같은 행 하나를 찾으라는 조건
     )
 
+    
+    latest_analysis = post.analyses.order_by("-created_at").first()  # 이 게시물의 가장 최근 분석 기록 (없으면 None)
     if request.user.is_authenticated:  # feed()와 동일하게, 로그인 여부로 분기
         post.is_liked = Like.objects.filter(post=post, user=request.user).exists()
         # 이 게시물에 대해 (post, 현재유저) 조합의 Like가 존재하는지 True/False로 확인
     else:
         post.is_liked = False  # 로그인 안 한 사람은 좋아요를 누른 적이 있을 수 없음
 
-    return render(request, "posts/detail.html", {"post": post})  # posts 리스트가 아니라 post 하나만 템플릿에 넘김
+    return render(request, "posts/detail.html", {"post": post, "latest_analysis": latest_analysis})
 
 class PostListCreateAPIView(generics.ListCreateAPIView):
     queryset = Post.objects.select_related("user").order_by("-created_at")

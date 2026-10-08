@@ -14,6 +14,17 @@
 {% block content %}
 <div class="feed">
     <a href="{% url 'posts:feed' %}" class="detail__back">← 피드로 돌아가기</a>
-    {% include "posts/_post_card.html" %}
+{% include "posts/_post_card.html" %}
+{% if user.is_authenticated %}                                      {# 게시물 소유 여부와 무관하게, 로그인만 하면 노출 #}
+{% if latest_analysis %}
+<a href="{% url 'analysis:result' post.id %}" class="btn btn--ghost">AI 분석 결과 보기</a>
+{% endif %}
+<form method="post" action="{% url 'analysis:request' post.id %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn--primary">
+        {% if latest_analysis %}AI 재분석 요청{% else %}AI 분석 요청{% endif %}
+    </button>
+</form>
+{% endif %}
 </div>
 {% endblock %}

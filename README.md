@@ -10,6 +10,7 @@ Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일
 - Django REST Framework >= 3.17.1
 - Pillow (이미지 처리)
 - SQLite (개발용 DB)
+- Celery + Redis (AI 분석 비동기 작업 큐)
 - 패키지 관리: [uv](https://docs.astral.sh/uv/)
 
 ## 프로젝트 구조
@@ -18,7 +19,8 @@ Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일
 config/         # 프로젝트 설정, URL 라우팅
 accounts/       # 커스텀 유저 모델, 마이페이지/로그인 화면
 posts/          # 게시물, 댓글, 좋아요 (모델 + DRF API)
-analysis/       # 이미지 스타일 분석 결과 (FastAPI 콜백 연동 예정)
+analysis/       #  이미지 스타일 분석 (Celery 비동기 파이프라인, 더미데이터로 전체 흐름 구현 완료 / 실제 CV·LLM은 FastAPI 연동 예정)
+config/celery.py  # Celery 앱 설정
 templates/      # 서버 렌더링 템플릿 (feed, mypage, login, analysis)
 static/         #  CSS(디자인 시스템 변수 기반), JS, 이미지
 media/          # 업로드된 게시물 이미지
@@ -48,10 +50,20 @@ media/          # 업로드된 게시물 이미지
   - `POST /api/posts/<post_id>/like/` — 좋아요 토글
 
 ### analysis
-- `Analysis`: 게시물에 대한 스타일 분석 요청/상태(`대기중`/`분석중`/`완료`/`실패`) 관리, FastAPI 콜백 검증용 토큰 보유
+- `Analysis`: 스타일 분석 요청/상태(`대기중`/`분석중`/`완료`/`실패`) 관리. `post` 또는 `image` 둘 중 하나로 "무엇을 분석하는지" 연결(둘 다 nullable), 콜백 검증용 토큰 보유
 - `DetectedItem`: 분석으로 검출된 의류 아이템(카테고리, 바운딩 박스, 쇼핑 검색 링크)
 - `StyleScore`: 스타일별 비율 점수
-- `/analysis/` : 분석 홈 페이지 (디자인 적용 완료, 실제 분석 기능은 미구현)
+- 현재 CV/LLM 분석 로직은 더미데이터로 대체되어 있고(Celery task가 5초 대기 후 고정된 가짜 결과를 콜백으로 저장), 비동기 파이프라인(Celery+Redis, 콜백 기반 상태 전환) 자체는 실제 서비스와 동일한 구조로 구현되어 있음. 실제 CV/LLM 모델은 별도 FastAPI 서버 연동 예정.
+- 두 가지 분석 요청 방식:
+  - **게시물 기반**: `/posts/<id>/` 상세 페이지의 "AI 분석 요청" 버튼 — 로그인한 유저라면 소유자 여부와 무관하게 누구나 요청 가능, 재분석도 횟수 제한 없음
+  - **독립 업로드**: `/analysis/` 에서 게시물 없이 이미지 한 장만 업로드해 분석
+- 분석 대기 중에는 결과 페이지가 3초마다 상태를 폴링(JS `fetch`)해서, 완료되면 자동으로 새로고침됨 (수동 새로고침 불필요)
+- 주요 경로
+  - `/analysis/` — 업로드 폼 (분석 홈)
+  - `/posts/<post_id>/` 상세 페이지 내 요청 버튼 → `/analysis/post/<post_id>/request/`, 결과는 `/analysis/post/<post_id>/result/`
+  - `/analysis/upload/` — 독립 업로드 처리, 결과는 `/analysis/<analysis_id>/result/`
+  - `/analysis/api/<analysis_id>/callback/` — Celery task → Django 콜백 (토큰 검증)
+  - `/analysis/api/<analysis_id>/status/` — 결과 페이지 폴링용 상태 조회 API
 
 
 ## 실행 방법
@@ -63,11 +75,25 @@ media/          # 업로드된 게시물 이미지
 - 적용된 페이지: 공통 상/하단 바, 피드, 마이페이지, 게시글 상세, 로그인/회원가입, AI 분석(플레이스홀더)
 - 페이지별 CSS는 `static/css/`에 파일 단위로 분리 (`feed.css`, `mypage.css`, `auth.css`, `analysis.css`)
 
+AI 분석 기능은 Redis + Celery worker가 같이 떠 있어야 동작합니다. 터미널 3개를 띄워서 각각 실행하세요.
+
 ```bash
+# 터미널 1 — Redis (Celery 작업 큐)
+redis-server
+
+# 터미널 2 — Celery worker
 uv sync
+uv run celery -A config worker -l info
+
+# 터미널 3 — Django 서버
 uv run python manage.py migrate
 uv run python manage.py runserver
+
 ```
+
+
+---
+
 
 ## 테스트 실행
 
@@ -83,4 +109,4 @@ uv run python manage.py test accounts
 
 - `LANGUAGE_CODE`, `TIME_ZONE`은 한국(`ko-kr`, `Asia/Seoul`) 기준으로 설정되어 있습니다.
 - `SECRET_KEY`는 개발용 기본값이며, 배포 전 환경 변수 등으로 교체가 필요합니다.
-- 이미지 분석을 담당할 FastAPI 서버는 아직 이 저장소에 포함되어 있지 않습니다.
+- 이미지 분석을 담당할 FastAPI 서버(실제 CV/LLM)는 아직 이 저장소에 포함되어 있지 않습니다. 현재는 Celery task가 고정된 더미 결과를 반환하는 방식으로, 비동기 요청→콜백→상태 전환 전체 흐름만 검증된 상태입니다.

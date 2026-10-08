@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}AI 분석 결과{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/analysis.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/analysis.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="analysis-placeholder">
+    <a href="{% url 'analysis:home' %}" class="detail__back">← AI 분석으로 돌아가기</a>  {# B 플로우는 게시글이 없어서 analysis:home으로 #}
+
+    {% if analysis.image %}                                           {# post 없이 업로드한 이미지라, 결과 위에 원본 이미지를 보여줌 #}
+    <img src="{{ analysis.image.url }}" alt="업로드한 이미지" class="analysis-placeholder__preview">
+    {% endif %}
+
+    {% if analysis.status == "completed" %}                            {# 분석 완료 상태면 결과 전부 표시 (result.html과 동일) #}
+        <h1 class="analysis-placeholder__title">AI 스타일 분석 결과</h1>
+
+        {% for score in analysis.style_scores.all %}
+        <p>{{ score.style_name }}: {{ score.ratio }}%</p>
+        {% endfor %}
+
+        <p class="analysis-placeholder__desc">{{ analysis.interpretation }}</p>
+
+        <ul>
+            {% for item in analysis.detected_items.all %}
+            <li><a href="{{ item.search_url }}" target="_blank" rel="noopener">{{ item.category }} - {{ item.label }}</a></li>
+            {% endfor %}
+        </ul>
+
+    {% elif analysis.status == "failed" %}                             {# 실패 상태면 에러 메시지 #}
+        <p class="analysis-placeholder__desc">분석에 실패했습니다: {{ analysis.error_message }}</p>
+
+    {% else %}
+        <div class="analysis-polling" data-status-url="{% url 'analysis:status' analysis.id %}">
+            <p class="analysis-placeholder__desc">분석 중입니다... 완료되면 자동으로 새로고침됩니다.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
