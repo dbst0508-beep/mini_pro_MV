@@ -45,3 +45,30 @@
     color: var(--color-text-muted);                    /* 보조 글자색 (은은하게) */
     margin: 0;                                          /* 기본 마진 제거 */
 }
+
+.analysis-placeholder__upload-form {
+    display: flex;                                   /* 파일 선택창 + 버튼을 세로로 쌓기 위한 flex 컨테이너 */
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);                              /* 입력창과 버튼 사이 간격 (8px) */
+    margin-top: var(--space-lg);                        /* 위 설명 문구와의 간격 (24px) */
+    width: 100%;
+    max-width: 320px;                                    /* 너무 넓게 퍼지지 않게 제한 */
+}
+
+
+.analysis-placeholder__preview {
+    max-width: 100%;                                    /* 원본 비율 유지하면서 컨테이너 폭 안으로 제한 */
+    border-radius: var(--radius-md);                      /* 카드급 큰 둥근모서리 */
+    margin-bottom: var(--space-lg);                        /* 아래 결과 텍스트와의 간격 (24px) */
+    border: 1px solid var(--color-border);
+}
+
+.analysis-placeholder__upload-form input[type="file"] {
+    width: 100%;
+    padding: var(--space-sm);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    font-size: 13px;
+}

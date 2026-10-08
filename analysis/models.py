@@ -21,6 +21,11 @@ class Analysis(models.Model):
         "posts.Post",  # 다른 앱의 모델이라 "앱이름.모델명" 문자열로 참조
         on_delete=models.CASCADE,  # 게시물 삭제되면 분석 기록도 같이 삭제
         related_name="analyses",  # post.analyses.all()로 조회 가능
+        null=True, blank=True,  # B 플로우(독립 업로드)는 게시물 없이 분석하므로 비워둘 수 있게 변경
+    )
+    image = models.ImageField(
+        upload_to="analysis_uploads/",  # B 플로우에서 업로드한 이미지가 저장될 경로 (media/analysis_uploads/)
+        blank=True, null=True,  # post가 있는 A 플로우(게시물 기반)에서는 이 필드가 비어있음
     )
     status = models.CharField(
         max_length=20,
@@ -29,6 +34,7 @@ class Analysis(models.Model):
     )
     callback_token = models.CharField(max_length=64, unique=True)  # FastAPI 콜백 요청 검증용 토큰
     error_message = models.TextField(blank=True)  # 실패 시 에러 내용, 평소엔 빈 문자열
+    interpretation = models.TextField(blank=True)  # LLM이 생성한 스타일 해석 텍스트, 분석 완료 전엔 빈 문자열
     created_at = models.DateTimeField(auto_now_add=True)  # 생성 시각, 최초 1회만 기록
     updated_at = models.DateTimeField(auto_now=True)  # 저장할 때마다 갱신되는 시각 (status 바뀔 때마다 갱신)
 

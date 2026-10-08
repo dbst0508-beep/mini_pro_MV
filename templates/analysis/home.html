@@ -4,20 +4,29 @@
 {% block title %}AI 분석{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/analysis.css' %}">   {# 방금 만든 analysis.css 연결 #}
+<link rel="stylesheet" href="{% static 'css/analysis.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="analysis-placeholder">                                {# 페이지 전체를 감싸는 빈 상태 컨테이너 #}
-    <div class="analysis-placeholder__icon">                      {# 로고를 담을 원형 배경 #}
-        <img src="{% static 'images/momvision_logo_v1.png' %}" alt="mom vision" class="analysis-placeholder__logo">  {# 브랜드 로고 재사용 #}
+<div class="analysis-placeholder">                                {# 페이지 전체를 감싸는 컨테이너 (레이아웃은 그대로 재사용) #}
+    <div class="analysis-placeholder__icon">
+        <img src="{% static 'images/momvision_logo_v1.png' %}" alt="mom vision" class="analysis-placeholder__logo">
     </div>
-    <span class="analysis-placeholder__badge">준비 중</span>        {# 상태를 알려주는 작은 배지 #}
-    <h1 class="analysis-placeholder__title">AI 스타일 분석</h1>       {# 페이지 제목 #}
-    <p class="analysis-placeholder__desc">                          {# 기능을 미리 설명하는 문구 #}
-        업로드한 룩 사진에서 옷 아이템을 인식하고,<br>
-        캐주얼/스트릿 같은 스타일 비율을 분석해<br>
-        AI가 텍스트로 해석해드릴 예정이에요.
+    <h1 class="analysis-placeholder__title">AI 스타일 분석</h1>
+    <p class="analysis-placeholder__desc">
+        잘 입은 룩 사진을 올리면<br>
+        옷 아이템을 인식하고 캐주얼/스트릿 같은<br>
+        스타일 비율을 분석해 AI가 텍스트로 해석해드려요.
     </p>
+
+    {% if user.is_authenticated %}
+    <form method="post" action="{% url 'analysis:upload' %}" enctype="multipart/form-data" class="analysis-placeholder__upload-form">
+        {% csrf_token %}
+        <input type="file" name="image" accept="image/*" required>  {# view의 request.FILES["image"]와 이름 맞춤 #}
+        <button type="submit" class="btn btn--primary">분석 시작</button>
+    </form>
+    {% else %}
+    <a href="{% url 'accounts:login_page' %}" class="btn btn--primary">로그인하고 분석하기</a>  {# 업로드 view가 @login_required라 익명은 막힘 #}
+    {% endif %}
 </div>
 {% endblock %}

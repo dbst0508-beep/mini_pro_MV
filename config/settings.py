@@ -126,3 +126,13 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Celery
+CELERY_BROKER_URL = "redis://localhost:6379/0"        # 작업 큐로 쓸 Redis 주소 (DB 인덱스 0번)
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"     # 작업 결과 저장도 같은 Redis에 (지금 단계에선 결과 조회 안 쓰지만 기본값으로 설정)
+CELERY_ACCEPT_CONTENT = ["json"]                          # task 인자/결과를 json으로만 주고받음 (보안상 pickle 금지)
+CELERY_TASK_SERIALIZER = "json"                            # task 인자 직렬화 방식
+CELERY_RESULT_SERIALIZER = "json"                           # 결과 직렬화 방식
+
+# 콜백 URL 조립에 쓸 내부 서버 주소 (지금은 Celery task가 Django 자기 자신을 호출하는 데 사용,
+# 나중에 실제 FastAPI가 이 자리를 대체할 때는 FastAPI 쪽 설정이 되므로 여기선 그대로 둠)
+INTERNAL_BASE_URL = "http://localhost:8000"
