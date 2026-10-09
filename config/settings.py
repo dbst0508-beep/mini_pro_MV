@@ -136,3 +136,5 @@ CELERY_RESULT_SERIALIZER = "json"                           # 결과 직렬화 �
 # 콜백 URL 조립에 쓸 내부 서버 주소 (지금은 Celery task가 Django 자기 자신을 호출하는 데 사용,
 # 나중에 실제 FastAPI가 이 자리를 대체할 때는 FastAPI 쪽 설정이 되므로 여기선 그대로 둠)
 INTERNAL_BASE_URL = "http://localhost:8000"
+ # CV 분석을 맡은 FastAPI 서버 주소 (cv_service/, 8001번 포트)
+CV_SERVICE_BASE_URL = "http://localhost:8001"
