@@ -1,41 +1,55 @@
 from fastapi import FastAPI, UploadFile, Form  # UploadFile: 업로드 파일 타입, Form: 파일과 같이 오는 텍스트 필드
-from .schemas import CallbackPayload, DetectedItemPayload, StyleScorePayload  # 3번에서 만든 스키마들
-from .callback import send_callback  # 5번 단계에서 만들 함수 (아직 파일 없어도 지금은 import만 적어둠)
+from PIL import Image  # 업로드된 파일을 실제 이미지 객체로 열기 위한 라이브러리
+from urllib.parse import quote  # 한글 라벨을 URL에 안전하게 넣기 위한 인코딩 함수
+from .schemas import CallbackPayload, DetectedItemPayload, StyleScorePayload  # 데이터 모양 정의들
+from .callback import send_callback  # Django로 결과 POST 보내는 함수
+from .detection import detect_items  # ①탐지: 박스+카테고리
+from .labeling import label_items  # ②세부분류: 박스에 세부 라벨 붙이기
 
-app = FastAPI()  # 이 app 객체가 서버 전체를 대표함. uvicorn이 이 객체를 실행시킴
+app = FastAPI()
 
-@app.get("/health")  # GET 요청으로 /health 주소에 접근하면 아래 함수가 실행됨
+@app.get("/health")
 def health_check():
-    return {"status": "ok"}  # 서버가 살아있는지 확인하는 용도, 고정된 응답만 돌려줌
+    return {"status": "ok"}
 
-@app.post("/analyze")  # Django가 "이 사진 분석해줘"라고 호출할 주소
+@app.post("/analyze")
 def analyze(
-    image: UploadFile,                 # 업로드된 이미지 파일 (멀티파트 폼으로 옴)
-    callback_url: str = Form(...),       # 결과를 보낼 Django 콜백 전체 URL ("..." = 필수값이라는 뜻)
-    callback_token: str = Form(...),     # Django가 검증할 토큰, 받은 그대로 다시 실어서 돌려줄 것
+    image: UploadFile,
+    callback_url: str = Form(...),
+    callback_token: str = Form(...),
 ):
-    # 지금은 더미 단계라, 이미지 내용은 읽지 않고(아직 모델이 없으니까) 고정된 가짜 결과를 만듦
+    pil_image = Image.open(image.file).convert("RGB")  # 업로드된 파일을 이미지 객체로 열고, 모델이 기대하는 RGB로 통일
+
+    items = detect_items(pil_image)        # ①탐지: [{category, bbox_x, bbox_y, bbox_width, bbox_height}, ...]
+    items = label_items(pil_image, items)   # ②세부분류: 각 아이템에 "label" 키 채워 넣음
+
+    detected_item_payloads = [
+        DetectedItemPayload(
+            category=item["category"],
+            label=item["label"],
+            bbox_x=item["bbox_x"],
+            bbox_y=item["bbox_y"],
+            bbox_width=item["bbox_width"],
+            bbox_height=item["bbox_height"],
+            search_url=(
+                f"https://search.shopping.naver.com/search/all?query={quote(item['label'])}"
+                if item["label"] else ""
+            ),
+        )
+        for item in items
+    ]  # dict 리스트를 CallbackPayload가 요구하는 Pydantic 객체 리스트로 변환
+
     payload = CallbackPayload(
-        callback_token=callback_token,                 # Django가 준 토큰을 그대로 돌려줌
-        detected_items=[
-            DetectedItemPayload(
-                category="상의", label="니트",
-                bbox_x=0.1, bbox_y=0.1, bbox_width=0.4, bbox_height=0.5,
-                search_url="https://search.shopping.naver.com/search/all?query=니트",
-            ),
-            DetectedItemPayload(
-                category="하의", label="청바지",
-                bbox_x=0.15, bbox_y=0.55, bbox_width=0.35, bbox_height=0.4,
-                search_url="https://search.shopping.naver.com/search/all?query=청바지",
-            ),
-        ],
+        callback_token=callback_token,
+        detected_items=detected_item_payloads,     # 이제 진짜 탐지+라벨링 결과
+        # 스타일 비율/해석은 아직 더미 — 비전 LLM 연동은 다음 작업 범위
         style_scores=[
             StyleScorePayload(style_name="캐주얼", ratio=60.0),
             StyleScorePayload(style_name="스트릿", ratio=40.0),
         ],
-        interpretation="캐주얼한 니트와 청바지 조합으로, 편안하면서도 트렌디한 스트릿 무드가 느껴지는 룩입니다.",
+        interpretation="(더미) 비전 LLM 연동 전이라 해석 텍스트는 임시 고정값입니다.",
     )
 
-    send_callback(callback_url, payload)  # 5번에서 만들 함수 — Django로 실제 POST 전송
+    send_callback(callback_url, payload)
 
-    return {"ok": True}  # Django(나중엔 Celery task)에게 "요청 잘 받았다"고 바로 응답
+    return {"ok": True}
