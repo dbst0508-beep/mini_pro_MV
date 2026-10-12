@@ -125,10 +125,14 @@ uv run python manage.py runserver
 ```bash
 uv run python manage.py test posts
 uv run python manage.py test accounts
+uv run python manage.py test analysis
 ```
 
 - posts: 좋아요/댓글 생성·조회·수정·삭제, 게시물 등록 API 테스트 (16개)
 - accounts: 회원가입/로그인/로그아웃/마이페이지 테스트 (13개)
+- analysis: 콜백 토큰 검증·결과 저장, 분석 요청 권한(게시물 기반/독립 업로드), 상태 조회의 오래된 분석 실패 전환, 실패 기록 함수, Celery task의 실패 처리 테스트 (15개)
+  - Celery와 cv_service 호출은 `unittest.mock`으로 대체하므로 Redis/Celery/cv_service를 켜지 않아도 실행됩니다.
+  - 테스트용 이미지는 임시 폴더에 저장되고 테스트가 끝나면 삭제됩니다 (`media/`에 남지 않음).
 
 ## 참고
 
