@@ -56,7 +56,12 @@ media/          # 업로드된 게시물 이미지
 - `Analysis`: 스타일 분석 요청/상태(`대기중`/`분석중`/`완료`/`실패`) 관리. `post` 또는 `image` 둘 중 하나로 "무엇을 분석하는지" 연결(둘 다 nullable), 콜백 검증용 토큰 보유
 - `DetectedItem`: 분석으로 검출된 의류 아이템(카테고리, 바운딩 박스, 쇼핑 검색 링크)
 - `StyleScore`: 스타일별 비율 점수
-- Celery task(`run_dummy_analysis`)는 이미지를 `cv_service`의 `/analyze`로 전달하고, `cv_service`가 결과를 Django 콜백으로 되돌려주는 구조로 연동되어 있음. 비동기 파이프라인(요청 → FastAPI 호출 → 콜백 → 상태 전환) 전체가 실제 모델 기반으로 동작함 — `detected_items`의 카테고리/바운딩박스는 CV 탐지 모델, 세부 라벨·`style_scores`·`interpretation`은 Gemini가 생성한 결과.
+- Celery task(`run_analysis`)는 이미지를 `cv_service`의 `/analyze`로 전달하고, `cv_service`가 결과를 Django 콜백으로 되돌려주는 구조로 연동되어 있음. 비동기 파이프라인(요청 → FastAPI 호출 → 콜백 → 상태 전환) 전체가 실제 모델 기반으로 동작함 — `detected_items`의 카테고리/바운딩박스는 CV 탐지 모델, 세부 라벨·`style_scores`·`interpretation`은 Gemini가 생성한 결과.
+- 실패 처리: 분석이 끝나지 못하면 상태를 `실패`로 바꾸고 결과 페이지에 안내 문구를 표시 (화면이 "분석 중"으로 멈춰 있지 않음)
+  - cv_service 연결 불가 / 응답 시간 초과(연결 5초, 응답 300초) / cv_service 에러 응답 → Celery task가 감지해 `error_message`에 안내 문구 저장
+  - Django 콜백 저장 실패 → cv_service가 콜백 응답을 확인해 에러로 응답 → 위와 같은 경로로 실패 기록
+  - Celery/Redis가 꺼져 작업이 시작조차 안 된 경우 → 상태 조회 API가 요청 후 6분이 지난 미완료 분석을 실패로 전환
+  - 이미 `완료`된 분석은 실패로 덮어쓰지 않음
 - 두 가지 분석 요청 방식:
   - **게시물 기반**: `/posts/<id>/` 상세 페이지의 "AI 분석 요청" 버튼 — 로그인한 유저라면 소유자 여부와 무관하게 누구나 요청 가능, 재분석도 횟수 제한 없음
   - **독립 업로드**: `/analysis/` 에서 게시물 없이 이미지 한 장만 업로드해 분석
@@ -66,7 +71,7 @@ media/          # 업로드된 게시물 이미지
   - `/posts/<post_id>/` 상세 페이지 내 요청 버튼 → `/analysis/post/<post_id>/request/`, 결과는 `/analysis/post/<post_id>/result/`
   - `/analysis/upload/` — 독립 업로드 처리, 결과는 `/analysis/<analysis_id>/result/`
   - `/analysis/api/<analysis_id>/callback/` — Celery task → Django 콜백 (토큰 검증)
-  - `/analysis/api/<analysis_id>/status/` — 결과 페이지 폴링용 상태 조회 API
+  - `/analysis/api/<analysis_id>/status/` — 결과 페이지 폴링용 상태 조회 API (오래된 미완료 분석의 실패 전환도 여기서 처리)
 
 ### cv_service (FastAPI)
 - Django와 완전히 분리된 독립 프로젝트 (`cv_service/pyproject.toml`, 자체 가상환경, 포트 8001)
