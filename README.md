@@ -1,6 +1,6 @@
 # Mini Project 1 — 패션 SNS
 
-Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일 분석은 별도 FastAPI 서버(`cv_service/`)가 콜백 방식으로 처리하는 구조입니다. 실제 CV 객체 탐지 + 세부 라벨링 모델이 연동되어 동작하며, 스타일 비율/해석을 맡을 비전 LLM 연동은 예정되어 있습니다.
+Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일 분석은 별도 FastAPI 서버(`cv_service/`)가 콜백 방식으로 처리하는 구조입니다. 실제 CV 객체 탐지 모델과 비전 LLM(Gemini)이 연동되어, 아이템 탐지·세부 라벨·스타일 비율·해석 텍스트가 모두 실제 모델 결과로 동작합니다.
 
 ## 기술 스택
 
@@ -12,6 +12,7 @@ Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일
 - Celery + Redis (AI 분석 비동기 작업 큐)
 - FastAPI + uvicorn (`cv_service/` — CV/LLM 분석 전용 서버, Django와 독립된 가상환경)
 - PyTorch + Transformers + timm (`cv_service/` — 객체 탐지/이미지-텍스트 모델 추론)
+- Gemini API (`google-genai`, `gemini-3.8-flash` — 스타일 비율·해석 텍스트·아이템 세부 라벨 생성)
 - 패키지 관리: [uv](https://docs.astral.sh/uv/)
 
 ## 프로젝트 구조
@@ -22,7 +23,7 @@ accounts/       # 커스텀 유저 모델, 마이페이지/로그인 화면
 posts/          # 게시물, 댓글, 좋아요 (모델 + DRF API)
 analysis/       #  이미지 스타일 분석 (Celery 비동기 파이프라인, Django 측 로직은 완성 / 실제 CV·LLM은 cv_service 연동)
 config/celery.py  # Celery 앱 설정
-cv_service/     # FastAPI 기반 CV/LLM 분석 서버 (Django와 별도 pyproject.toml/가상환경, 포트 8001). 객체 탐지+세부 라벨링 연동 완료, 비전 LLM 연동 예정
+cv_service/     # FastAPI 기반 CV/LLM 분석 서버 (Django와 별도 pyproject.toml/가상환경, 포트 8001). 객체 탐지 + 세부 라벨링 + 비전 LLM(Gemini) 연동 완료
 templates/      # 서버 렌더링 템플릿 (feed, mypage, login, analysis)
 static/         #  CSS(디자인 시스템 변수 기반), JS, 이미지
 media/          # 업로드된 게시물 이미지
@@ -55,7 +56,7 @@ media/          # 업로드된 게시물 이미지
 - `Analysis`: 스타일 분석 요청/상태(`대기중`/`분석중`/`완료`/`실패`) 관리. `post` 또는 `image` 둘 중 하나로 "무엇을 분석하는지" 연결(둘 다 nullable), 콜백 검증용 토큰 보유
 - `DetectedItem`: 분석으로 검출된 의류 아이템(카테고리, 바운딩 박스, 쇼핑 검색 링크)
 - `StyleScore`: 스타일별 비율 점수
-- Celery task(`run_dummy_analysis`)는 이미지를 `cv_service`의 `/analyze`로 전달하고, `cv_service`가 결과를 Django 콜백으로 되돌려주는 구조로 연동되어 있음. 비동기 파이프라인(요청 → FastAPI 호출 → 콜백 → 상태 전환) 전체가 실제 모델 기반으로 동작함 — `detected_items`(카테고리/세부 라벨/바운딩박스)는 실제 CV 모델 추론 결과이고, `style_scores`/`interpretation`은 비전 LLM 연동 전이라 아직 고정값.
+- Celery task(`run_dummy_analysis`)는 이미지를 `cv_service`의 `/analyze`로 전달하고, `cv_service`가 결과를 Django 콜백으로 되돌려주는 구조로 연동되어 있음. 비동기 파이프라인(요청 → FastAPI 호출 → 콜백 → 상태 전환) 전체가 실제 모델 기반으로 동작함 — `detected_items`의 카테고리/바운딩박스는 CV 탐지 모델, 세부 라벨·`style_scores`·`interpretation`은 Gemini가 생성한 결과.
 - 두 가지 분석 요청 방식:
   - **게시물 기반**: `/posts/<id>/` 상세 페이지의 "AI 분석 요청" 버튼 — 로그인한 유저라면 소유자 여부와 무관하게 누구나 요청 가능, 재분석도 횟수 제한 없음
   - **독립 업로드**: `/analysis/` 에서 게시물 없이 이미지 한 장만 업로드해 분석
@@ -73,8 +74,10 @@ media/          # 업로드된 게시물 이미지
 - `GET /health` — 서버 생존 확인용
 - `app/ml_models.py` — 서버 기동 시 모델을 한 번만 로딩 (모듈 레벨 로딩, 요청마다 재로딩 방지)
 - `app/detection.py` — 객체 탐지 모델(`yainage90/fashion-object-detection`, conditional-detr-resnet-50 파인튜닝)로 옷 아이템의 바운딩박스 + 큰 카테고리(상의/하의/아우터/원피스/신발/가방/모자) 탐지, 0~1 정규화 좌표로 변환
-- `app/labeling.py` — 탐지된 박스 영역을 크롭해 세부 라벨링 모델(`patrickjohncyh/fashion-clip`)로 zero-shot 세부 분류 (카테고리별 한글 후보 라벨 목록 기반)
-- 스타일 비율(`style_scores`)과 해석 텍스트(`interpretation`)는 비전 LLM 연동 전이라 아직 고정값 — 다음 작업 범위
+- `app/labeling.py` — 탐지된 박스 영역을 크롭해 세부 라벨링 모델(`patrickjohncyh/fashion-clip`)로 zero-shot 세부 분류 (카테고리별 한글 후보 라벨 목록 기반). Gemini 호출이 실패했을 때 쓰는 예비 라벨 역할이며, 카테고리와 라벨이 같은 중복 아이템(좌우 신발 등)을 합치는 `merge_duplicates`도 포함
+- `app/interpretation.py` — 사진과 탐지 결과(번호·카테고리·위치)를 Gemini에 보내 스타일 비율(`style_scores`), 해석 텍스트(`interpretation`), 아이템별 세부 라벨을 한 번의 호출로 생성. 구조화 출력(JSON 스키마)을 사용하고, 스타일 이름 중복 병합과 비율 합 100 정규화를 거침
+- Gemini 호출이 성공하면 세부 라벨을 Gemini 결과로 덮어쓰고, 실패하면 FashionCLIP 라벨과 안내 문구로 대체해 탐지 결과는 그대로 저장
+- API 키는 `cv_service/.env`의 `GEMINI_API_KEY`로 관리 (깃 추적 제외)
 
 
 ## 실행 방법
@@ -126,5 +129,6 @@ uv run python manage.py test accounts
 
 - `LANGUAGE_CODE`, `TIME_ZONE`은 한국(`ko-kr`, `Asia/Seoul`) 기준으로 설정되어 있습니다.
 - `SECRET_KEY`는 개발용 기본값이며, 배포 전 환경 변수 등으로 교체가 필요합니다.
-- 이미지 분석을 담당할 `cv_service`(FastAPI)는 이 저장소에 포함되어 있으며, 실제 객체 탐지 + 세부 라벨링 모델이 동작합니다. 스타일 비율/해석 텍스트는 비전 LLM 연동 전이라 아직 고정값이고, Django ↔ FastAPI 간 비동기 요청→콜백→상태 전환 전체 흐름은 검증된 상태입니다.
+- 이미지 분석을 담당할 `cv_service`(FastAPI)는 이 저장소에 포함되어 있으며, 실제 객체 탐지 + 세부 라벨링 모델이 동작합니다. 스타일 비율/해석 텍스트/세부 라벨은 Gemini API로 생성하며, Django ↔ FastAPI 간 비동기 요청→콜백→상태 전환 전체 흐름은 검증된 상태입니다.
 - `cv_service`를 처음 실행하면 허깅페이스에서 모델 가중치를 다운로드하므로 기동에 시간이 걸릴 수 있습니다 (이후엔 로컬 캐시 사용).
+- 서버를 켠 직후의 첫 분석은 모델 준비 시간 때문에 1분 이상 걸릴 수 있고, 이후 분석은 수 초 내에 끝납니다.
