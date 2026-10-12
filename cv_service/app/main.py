@@ -7,7 +7,6 @@ from .detection import detect_items  # ①탐지: 박스+카테고리
 from .labeling import label_items, merge_duplicates  # ②세부분류: 박스에 세부 라벨 붙이기 + 중복 합치기
 from .interpretation import interpret_style  # ③해석: 스타일 비율 + 해석 텍스트 (Gemini)
 
-
 app = FastAPI()
 
 @app.get("/health")

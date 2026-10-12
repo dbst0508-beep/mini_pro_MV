@@ -1,13 +1,17 @@
 import secrets                                              # 랜덤한 콜백 토큰을 만드는 표준 라이브러리
+from datetime import timedelta                              # "6분" 같은 시간 간격을 표현할 때 씀
+from django.utils import timezone                            # 현재 시각을 가져올 때 씀
 from django.contrib.auth.decorators import login_required    # 로그인 안 했으면 로그인 페이지로 보내는 데코레이터
 from django.http import JsonResponse  # "권한 없음" 응답 (403)
 from posts.models import Post                                 # post_id로 게시물 찾을 때 씀
-from .tasks import run_dummy_analysis                          # 4단계에서 만든 그 task
+from .tasks import run_analysis,mark_failed                          # 4단계에서 만든 그 task
 from django.shortcuts import render,redirect,get_object_or_404
 import json                                                # 요청 본문(JSON 문자열)을 파이썬 dict로 변환하는 데 사용
 from django.views.decorators.csrf import csrf_exempt        # 이 view는 CSRF 토큰 검사를 건너뛰게 해주는 데코레이터
 from django.views.decorators.http import require_POST, require_GET     # GET 등 다른 방식으로는 접근 못 하게 POST만 허용, get만 허용하는 레코드 추가
 from .models import Analysis, DetectedItem, StyleScore      # 이 view에서 쓸 모델 3개
+
+STALE_AFTER = timedelta(minutes=6)  # 요청 후 이 시간이 지나도 안 끝나면 실패로 봄 (Celery의 최대 대기 5분보다 길게)
 
 def home(request):
     return render(request, "analysis/home.html")
@@ -56,7 +60,7 @@ def request_analysis(request, post_id):
         post=post,
         callback_token=secrets.token_hex(32),
     )
-    run_dummy_analysis.delay(analysis.id)
+    run_analysis.delay(analysis.id)
 
     return redirect("analysis:result", post_id=post.id)               # 결과 페이지로 이동
 
@@ -75,7 +79,7 @@ def upload_and_analyze(request):
         image=image,
         callback_token=secrets.token_hex(32),
     )
-    run_dummy_analysis.delay(analysis.id)                           # 기존과 완전히 같은 task, post 유무를 신경 안 씀
+    run_analysis.delay(analysis.id)                           # 기존과 완전히 같은 task, post 유무를 신경 안 씀
 
     return redirect("analysis:standalone_result", analysis_id=analysis.id)
 
@@ -86,4 +90,10 @@ def standalone_result(request, analysis_id):                     # post_id가 �
 @require_GET                                                     # 상태 조회는 GET 요청만 허용 (JS가 fetch로 호출)
 def analysis_status(request, analysis_id):
     analysis = get_object_or_404(Analysis, pk=analysis_id)          # 없는 id면 404
+
+    is_waiting = analysis.status in (Analysis.STATUS_PENDING, Analysis.STATUS_PROCESSING)  # 아직 안 끝난 상태인지
+    if is_waiting and timezone.now() - analysis.created_at > STALE_AFTER:                  # 안 끝났는데 요청한 지 너무 오래됐으면
+        mark_failed(analysis.id, "분석이 시작되지 않았거나 너무 오래 걸리고 있습니다. 잠시 후 다시 시도해 주세요.")
+        analysis.refresh_from_db()                                    # 방금 DB에서 바뀐 상태를 다시 읽어옴
+
     return JsonResponse({"status": analysis.status})                  # 지금 상태값만 JSON으로 돌려줌
