@@ -95,7 +95,8 @@ redis-server
 # 터미널 2 — cv_service (FastAPI, Django와 별도 가상환경)
 cd cv_service
 uv sync
-uv run uvicorn app.main:app --reload --port 8001
+uv run --env-file .env uvicorn app.main:app --reload --port 8001
+# cv_service/.env에 GEMINI_API_KEY=발급받은_키가 있어야 서버가 기동됩니다. (키 발급: Google AI Studio)
 
 # 터미널 3 — Celery worker
 uv sync
