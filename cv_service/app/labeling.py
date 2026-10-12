@@ -97,3 +97,15 @@ def label_items(image, items):
     for item in items:
         item["label"] = label_item(image, item)
     return items
+
+def merge_duplicates(items):
+    """카테고리와 라벨이 모두 같은 아이템은 첫 번째 것만 남김 (예: 왼발/오른발 신발)"""
+    seen = set()  # 이미 나온 (카테고리, 라벨) 조합을 기억해 두는 집합
+    unique = []
+    for item in items:
+        key = (item["category"], item["label"])
+        if key in seen:
+            continue  # 이미 나온 조합이면 건너뜀
+        seen.add(key)
+        unique.append(item)
+    return unique

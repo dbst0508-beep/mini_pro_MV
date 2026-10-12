@@ -4,7 +4,7 @@ from urllib.parse import quote  # 한글 라벨을 URL에 안전하게 넣기 �
 from .schemas import CallbackPayload, DetectedItemPayload, StyleScorePayload  # 데이터 모양 정의들
 from .callback import send_callback  # Django로 결과 POST 보내는 함수
 from .detection import detect_items  # ①탐지: 박스+카테고리
-from .labeling import label_items  # ②세부분류: 박스에 세부 라벨 붙이기
+from .labeling import label_items, merge_duplicates  # ②세부분류: 박스에 세부 라벨 붙이기 + 중복 합치기
 from .interpretation import interpret_style  # ③해석: 스타일 비율 + 해석 텍스트 (Gemini)
 
 
@@ -25,6 +25,8 @@ def analyze(
     items = detect_items(pil_image)        # ①탐지: [{category, bbox_x, bbox_y, bbox_width, bbox_height}, ...]
     items = label_items(pil_image, items)   # ②세부분류: 각 아이템에 "label" 키 채워 넣음
     style_scores, interpretation = interpret_style(pil_image, items)  # ③해석: (스타일 비율 리스트, 해석 텍스트)
+    items = merge_duplicates(items)  # 같은 아이템(양쪽 신발 등)은 하나만 남김
+    
 
     detected_item_payloads = [
         DetectedItemPayload(
