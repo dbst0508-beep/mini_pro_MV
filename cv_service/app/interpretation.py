@@ -2,13 +2,22 @@ import base64  # 이미지(바이트)를 글자(문자열)로 바꿔서 API에 �
 import io  # 파일로 저장하지 않고 메모리 안에서 이미지를 JPEG로 변환할 때 씀
 from typing import List  # "이건 리스트 타입이다"라고 표시할 때 씀
 from google import genai  # Gemini API 공식 라이브러리
+from google.genai import types  # 접속 옵션(재시도 횟수 등)을 정하는 도구
 from pydantic import BaseModel, Field  # LLM이 돌려줄 답의 "모양"을 정의
 
 MODEL_NAME = "gemini-3.8-flash"  # 사용할 Gemini 모델 (무료 등급 제공)
 FALLBACK_INTERPRETATION = "스타일 해석을 생성하지 못했습니다. 잠시 후 다시 분석을 요청해 주세요."  # LLM 호출 실패 시 대신 보여줄 문구
 MAX_LABEL_LENGTH = 15  # ★ 라벨 최대 글자 수 (한글은 URL에 넣으면 9배로 길어져서, 쇼핑 검색 링크가 DB 한도 200자를 넘지 않게)
 
-client = genai.Client()  # 환경변수 GEMINI_API_KEY를 자동으로 읽어서 접속 준비 (서버 뜰 때 한 번만 실행)
+LLM_TIMEOUT = 30  # Gemini 답을 기다리는 최대 시간(초). 넘으면 포기하고 탐지 결과만 돌려줌
+
+LLM_RETRY_ATTEMPTS = 1  # 서버가 붐빌 때(503) 다시 시도하는 횟수. 기본값 3은 너무 오래 걸려서 줄임
+
+client = genai.Client(  # 환경변수 GEMINI_API_KEY를 자동으로 읽어서 접속 준비 (서버 뜰 때 한 번만 실행)
+    http_options=types.HttpOptions(  # 접속 방식 설정
+        retry_options=types.HttpRetryOptions(attempts=LLM_RETRY_ATTEMPTS),  # 재시도 횟수 제한
+    ),
+)
 
 
 class StyleScoreResult(BaseModel):
@@ -101,6 +110,7 @@ def interpret_style(image, items):
                 "mime_type": "application/json",
                 "schema": StyleAnalysisResult.model_json_schema(),
             },
+            timeout=LLM_TIMEOUT,  # 이 시간 안에 답이 안 오면 에러 → 아래 except가 받아서 대체 문구로 처리
         )
         result = StyleAnalysisResult.model_validate_json(interaction.output_text)  # JSON 글자 → 파이썬 객체 (모양이 틀리면 에러)
     except Exception as error:  # 한도 초과, 네트워크 오류, 이상한 응답 등 뭐가 터져도
