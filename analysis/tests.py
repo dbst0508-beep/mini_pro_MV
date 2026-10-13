@@ -229,3 +229,43 @@ class RunAnalysisTests(AnalysisTestCase):
         self.analysis.refresh_from_db()
         self.assertEqual(self.analysis.status, Analysis.STATUS_FAILED)
         self.assertIn("오류가 발생", self.analysis.error_message)  # 그 밖의 오류용 문구여야 함
+
+# 결과 페이지 테스트 코드 (게시물 기반)
+class ResultViewTests(AnalysisTestCase):
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("analysis:result", args=[self.post.id])  # 이 게시물의 결과 페이지 주소
+
+    def complete(self, analysis):  # 분석을 "완료" 상태로 만드는 도우미
+        Analysis.objects.filter(pk=analysis.pk).update(status=Analysis.STATUS_COMPLETED)
+
+    def add_failed_retry(self):  # 나중에 요청한 재분석이 실패한 상황을 만드는 도우미
+        return Analysis.objects.create(
+            post=self.post, callback_token="retry-token",
+            status=Analysis.STATUS_FAILED, error_message="재분석 실패 문구",
+        )
+
+    def test_completed_result_shows_photo_and_title(self):
+        self.complete(self.analysis)
+        response = self.client.get(self.url)
+
+        self.assertContains(response, self.post.image.url)  # 게시물 사진이 화면에 있어야 함
+        self.assertContains(response, "AI 스타일 분석 결과")  # 결과 제목이 나와야 함
+
+    def test_failed_retry_falls_back_to_previous_completed(self):
+        self.complete(self.analysis)
+        self.add_failed_retry()
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "AI 스타일 분석 결과")  # 이전에 성공한 결과를 보여줘야 함
+        self.assertContains(response, "이전 분석 결과를 보여드립니다")  # 재분석이 실패했다는 안내도 있어야 함
+        self.assertContains(response, "재분석 실패 문구")  # 실패 이유도 함께
+
+    def test_failed_without_previous_shows_error(self):
+        Analysis.objects.filter(pk=self.analysis.pk).update(
+            status=Analysis.STATUS_FAILED, error_message="첫 분석 실패 문구",
+        )
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "분석에 실패했습니다")  # 보여줄 이전 결과가 없으니 실패 화면
+        self.assertNotContains(response, "AI 스타일 분석 결과")  # 결과 제목은 나오면 안 됨
