@@ -72,3 +72,156 @@
     background: var(--color-surface);
     font-size: 13px;
 }
+
+/* ===== 분석 결과 페이지 ===== */
+.analysis-result {
+    padding: var(--space-lg) var(--space-md);         /* 위아래 24px, 좌우 16px */
+}
+
+.analysis-result__photo {
+    display: flex;                                   /* 안의 사진 틀을 가운데 놓기 위한 flex 컨테이너 */
+    justify-content: center;                          /* 가로 가운데 정렬 */
+    margin: var(--space-md) 0 var(--space-lg);         /* 위 16px, 아래 24px */
+}
+
+.analysis-result__frame {
+    position: relative;                              /* 안의 박스들이 이 틀을 기준으로 위치를 잡게 함 */
+    display: inline-block;                            /* 사진 크기에 딱 맞게 줄어듦 (그래야 %가 사진 기준이 됨) */
+    max-width: 100%;                                   /* 화면보다 넓어지지 않게 */
+    border-radius: var(--radius-md);                    /* 카드급 둥근모서리 */
+    overflow: hidden;                                    /* 둥근모서리 밖으로 삐져나온 부분 숨김 */
+    border: 1px solid var(--color-border);                /* 얇은 테두리 */
+}
+
+.analysis-result__image {
+    display: block;                                  /* 사진 아래 생기는 미세한 빈틈 제거 */
+    max-width: 100%;                                  /* 틀 폭 안으로 제한, 비율은 유지 */
+}
+
+.analysis-result__box {
+    position: absolute;                              /* 틀 안에서 left/top/width/height(%)로 위치 지정 */
+    box-sizing: border-box;                           /* 테두리 두께를 크기 안에 포함 */
+    border: 2px solid var(--color-accent);             /* 포인트 컬러 테두리 */
+    border-radius: var(--radius-sm);                    /* 살짝 둥글게 */
+}
+
+.analysis-result__badge {
+    position: absolute;                              /* 박스의 왼쪽 위 모서리에 붙임 */
+    top: -2px;                                        /* 테두리 두께만큼 올려서 모서리에 딱 맞춤 */
+    left: -2px;                                        /* 테두리 두께만큼 왼쪽으로 */
+    width: 20px;                                        /* 번호 원 지름 */
+    height: 20px;                                        /* 번호 원 지름 */
+    border-radius: 50%;                                   /* 원형 */
+    background: var(--color-accent);                       /* 포인트 컬러 배경 */
+    color: #ffffff;                                         /* 흰 글자 */
+    font-size: 12px;                                         /* 작은 번호 */
+    font-weight: 600;                                         /* 살짝 굵게 */
+    line-height: 20px;                                         /* 원 높이와 같게 해서 세로 가운데 */
+    text-align: center;                                         /* 가로 가운데 */
+}
+
+.analysis-result__badge--inline {
+    position: static;                                /* 아이템 카드 안에서는 모서리에 붙이지 않고 제자리에 */
+    flex-shrink: 0;                                   /* 글자가 길어져도 원이 찌그러지지 않게 */
+}
+
+.analysis-result__title {
+    font-size: 20px;                                 /* 페이지 제목 크기 */
+    text-align: center;                               /* 가운데 정렬 */
+    margin: 0 0 var(--space-lg) 0;                     /* 아래 24px */
+}
+
+.analysis-result__section {
+    margin-bottom: var(--space-lg);                  /* 구역 사이 간격 24px */
+}
+
+.analysis-result__heading {
+    font-size: 15px;                                 /* 구역 제목 크기 */
+    margin: 0 0 var(--space-sm) 0;                     /* 아래 8px */
+    color: var(--color-text);                           /* 기본 글자색 */
+}
+
+.analysis-result__score {
+    display: flex;                                   /* 이름 / 막대 / 숫자를 가로로 배치 */
+    align-items: center;                              /* 세로 가운데 정렬 */
+    gap: var(--space-sm);                              /* 사이 간격 8px */
+    margin-bottom: var(--space-sm);                     /* 줄 사이 간격 8px */
+    font-size: 14px;                                     /* 본문 크기 */
+}
+
+.analysis-result__score-name {
+    width: 72px;                                     /* 이름 칸 폭을 고정해 막대 시작 위치를 맞춤 */
+    flex-shrink: 0;                                   /* 줄어들지 않게 */
+}
+
+.analysis-result__bar {
+    flex: 1;                                         /* 남는 폭을 전부 차지 */
+    height: 10px;                                     /* 막대 두께 */
+    background: var(--color-accent-soft);              /* 옅은 바탕 */
+    border-radius: 999px;                               /* 양끝을 완전히 둥글게 */
+    overflow: hidden;                                    /* 채워진 부분이 둥근 바탕 밖으로 안 나가게 */
+}
+
+.analysis-result__bar-fill {
+    height: 100%;                                    /* 바탕 높이만큼 */
+    background: var(--color-accent);                  /* 포인트 컬러로 채움 */
+    border-radius: 999px;                              /* 끝을 둥글게 */
+}
+
+.analysis-result__score-ratio {
+    width: 40px;                                     /* 숫자 칸 폭 고정 */
+    text-align: right;                                /* 오른쪽 정렬 */
+    color: var(--color-text-muted);                    /* 보조 글자색 */
+}
+
+.analysis-result__interpretation {
+    font-size: 14px;                                 /* 본문 크기 */
+    line-height: 1.7;                                 /* 긴 글을 읽기 편하게 줄간격 넓힘 */
+    margin: 0;                                         /* 기본 마진 제거 */
+    padding: var(--space-md);                           /* 안쪽 여백 16px */
+    background: var(--color-bg);                         /* 옅은 회색 바탕 */
+    border-radius: var(--radius-md);                      /* 카드급 둥근모서리 */
+}
+
+.analysis-result__items {
+    list-style: none;                                /* 기본 점(•) 제거 */
+    margin: 0;                                        /* 기본 마진 제거 */
+    padding: 0;                                        /* 기본 들여쓰기 제거 */
+}
+
+.analysis-result__item {
+    display: flex;                                   /* 번호 / 글자 / 버튼을 가로로 배치 */
+    align-items: center;                              /* 세로 가운데 정렬 */
+    gap: var(--space-md);                              /* 사이 간격 16px */
+    padding: var(--space-md);                           /* 안쪽 여백 16px */
+    border: 1px solid var(--color-border);               /* 얇은 테두리 */
+    border-radius: var(--radius-md);                      /* 카드급 둥근모서리 */
+    margin-bottom: var(--space-sm);                        /* 카드 사이 간격 8px */
+}
+
+.analysis-result__item-text {
+    flex: 1;                                         /* 남는 폭을 차지해서 버튼을 오른쪽 끝으로 밀어냄 */
+    display: flex;                                    /* 카테고리와 라벨을 세로로 쌓기 위해 */
+    flex-direction: column;                            /* 세로 방향 */
+}
+
+.analysis-result__item-category {
+    font-size: 12px;                                 /* 작은 보조 글씨 */
+    color: var(--color-text-muted);                   /* 보조 글자색 */
+}
+
+.analysis-result__item-label {
+    font-size: 15px;                                 /* 아이템 이름은 조금 크게 */
+    font-weight: 600;                                 /* 굵게 */
+}
+
+.analysis-result__notice {
+    font-size: 13px;                                 /* 안내 문구는 작게 */
+    line-height: 1.5;                                 /* 두 줄이 될 때 읽기 편하게 */
+    color: var(--color-text-muted);                    /* 보조 글자색 */
+    background: var(--color-bg);                        /* 옅은 회색 바탕 */
+    border: 1px solid var(--color-border);               /* 얇은 테두리 */
+    border-radius: var(--radius-sm);                      /* 살짝 둥글게 */
+    padding: var(--space-sm) var(--space-md);              /* 위아래 8px, 좌우 16px */
+    margin: var(--space-md) 0 0 0;                          /* 위쪽 16px */
+}
