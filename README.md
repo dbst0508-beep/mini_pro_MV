@@ -87,6 +87,7 @@ media/          # 업로드된 게시물 이미지
 - `app/labeling.py` — 탐지된 박스 영역을 크롭해 세부 라벨링 모델(`patrickjohncyh/fashion-clip`)로 zero-shot 세부 분류 (카테고리별 한글 후보 라벨 목록 기반). Gemini 호출이 실패했을 때 쓰는 예비 라벨 역할이며, 카테고리와 라벨이 같은 중복 아이템(좌우 신발 등)을 합치는 `merge_duplicates`도 포함
 - `app/interpretation.py` — 사진과 탐지 결과(번호·카테고리·위치)를 Gemini에 보내 스타일 비율(`style_scores`), 해석 텍스트(`interpretation`), 아이템별 세부 라벨을 한 번의 호출로 생성. 구조화 출력(JSON 스키마)을 사용하고, 스타일 이름 중복 병합과 비율 합 100 정규화를 거침
 - Gemini 호출이 성공하면 세부 라벨을 Gemini 결과로 덮어쓰고, 실패하면 FashionCLIP 라벨과 안내 문구로 대체해 탐지 결과는 그대로 저장
+- Gemini 응답 지연 대비: 요청 한 번당 30초 제한(`LLM_TIMEOUT`), 서버 혼잡(503) 시 재시도 1회(`LLM_RETRY_ATTEMPTS`)로 제한 → Gemini가 응답하지 않아도 약 1분 안에 탐지 결과만으로 분석이 완료됨 (제한이 없을 때는 Celery의 300초 제한에 걸려 분석 전체가 실패했음)
 - API 키는 `cv_service/.env`의 `GEMINI_API_KEY`로 관리 (깃 추적 제외)
 
 
