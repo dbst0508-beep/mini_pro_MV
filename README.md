@@ -140,6 +140,16 @@ uv run python manage.py test analysis
   - Celery와 cv_service 호출은 `unittest.mock`으로 대체하므로 Redis/Celery/cv_service를 켜지 않아도 실행됩니다.
   - 테스트용 이미지는 임시 폴더에 저장되고 테스트가 끝나면 삭제됩니다 (`media/`에 남지 않음).
 
+`cv_service`는 별도 가상환경이라 해당 폴더에서 따로 실행합니다 (Django 없이 파이썬 기본 `unittest` 사용).
+
+```bash
+cd cv_service
+uv run --env-file .env python -m unittest -v
+```
+
+- cv_service: 스타일 비율 정리(`normalize_scores`), 라벨 적용(`apply_labels`), 중복 아이템 병합(`merge_duplicates`), Gemini 호출의 성공·실패·잘못된 응답·제한 시간 전달(`interpret_style`) 테스트 (17개)
+  - Gemini 접속 객체를 `unittest.mock`으로 대체하므로 인터넷 연결이나 API 사용량 없이 실행됩니다 (모듈을 불러올 때 API 키를 읽으므로 `--env-file .env`는 필요).
+
 ## 참고
 
 - `LANGUAGE_CODE`, `TIME_ZONE`은 한국(`ko-kr`, `Asia/Seoul`) 기준으로 설정되어 있습니다.
