@@ -68,7 +68,22 @@ def request_analysis(request, post_id):
 def result(request, post_id):
     post = get_object_or_404(Post, pk=post_id)                        # 결과를 볼 게시물 조회
     analysis = post.analyses.order_by("-created_at").first()             # 가장 최근 분석 기록 (없으면 None)
-    return render(request, "analysis/result.html", {"post": post, "analysis": analysis})
+    failed_retry = None                                                  # "실패한 재분석" 자리 (기본은 없음)
+
+    if analysis and analysis.status == Analysis.STATUS_FAILED:           # 가장 최근 분석이 실패했다면
+        last_completed = post.analyses.filter(                            # 이 게시물의 분석 중에서
+            status=Analysis.STATUS_COMPLETED                               # 완료된 것만 골라
+        ).order_by("-created_at").first()                                  # 그중 가장 최근 것
+        if last_completed:                                                # 이전에 성공한 결과가 있으면
+            failed_retry = analysis                                        # 실패한 것은 안내용으로 따로 두고
+            analysis = last_completed                                      # 화면에는 성공한 결과를 보여줌
+
+    return render(request, "analysis/result.html", {
+        "post": post,
+        "analysis": analysis,
+        "failed_retry": failed_retry,
+    })
+
 
 @login_required                                               # 업로드도 로그인 필수
 @require_POST
