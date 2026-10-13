@@ -38,6 +38,11 @@ class Analysis(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)  # 생성 시각, 최초 1회만 기록
     updated_at = models.DateTimeField(auto_now=True)  # 저장할 때마다 갱신되는 시각 (status 바뀔 때마다 갱신)
 
+    @property  # analysis.source_image 처럼 괄호 없이 값처럼 꺼내 쓸 수 있게 해주는 표시
+    def source_image(self):
+        """분석 대상 사진: 독립 업로드면 image, 게시물 기반이면 post.image"""
+        return self.image if self.image else self.post.image
+    
     def __str__(self):
         return f"Analysis #{self.pk} ({self.status})"
 
@@ -58,6 +63,7 @@ class DetectedItem(models.Model):
     bbox_height = models.FloatField()  # 박스 높이 (0~1)
 
     search_url = models.URLField(blank=True)  # 조립된 쇼핑 검색 링크
+
 
     def __str__(self):
         return f"{self.category} (analysis #{self.analysis_id})"

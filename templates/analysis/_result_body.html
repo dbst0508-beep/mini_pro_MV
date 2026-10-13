@@ -1,0 +1,67 @@
+
+{# 분석 결과 본문 — result.html과 standalone_result.html이 함께 쓰는 조각. 필요한 값: analysis #}
+{% with items=analysis.detected_items.all %}                          {# 아이템 목록을 한 번만 꺼내서 박스와 카드가 같은 순서를 쓰게 함 #}
+
+<div class="analysis-result__photo">
+    <div class="analysis-result__frame">                              {# 사진 크기에 딱 맞는 틀 — 박스 위치의 기준이 됨 #}
+        <img src="{{ analysis.source_image.url }}" alt="분석한 사진" class="analysis-result__image">
+        {% if analysis.status == "completed" %}                       {# 분석이 끝났을 때만 박스를 그림 #}
+            {% for item in items %}
+            <div class="analysis-result__box"
+                 style="left: {% widthratio item.bbox_x 1 100 %}%; top: {% widthratio item.bbox_y 1 100 %}%; width: {% widthratio item.bbox_width 1 100 %}%; height: {% widthratio item.bbox_height 1 100 %}%;">
+                <span class="analysis-result__badge">{{ forloop.counter }}</span>  {# 1부터 시작하는 번호 #}
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</div>
+
+{% if analysis.status == "completed" %}                               {# 분석 완료 상태면 결과 전부 표시 #}
+    <h1 class="analysis-result__title">AI 스타일 분석 결과</h1>
+
+    <section class="analysis-result__section">
+        <h2 class="analysis-result__heading">스타일 비율</h2>
+        {% for score in analysis.style_scores.all|dictsortreversed:"ratio" %}  {# 비율이 큰 것부터 #}
+        <div class="analysis-result__score">
+            <span class="analysis-result__score-name">{{ score.style_name }}</span>
+            <div class="analysis-result__bar">
+                <div class="analysis-result__bar-fill" style="width: {{ score.ratio|floatformat:0 }}%;"></div>  {# 비율만큼 막대를 채움 #}
+            </div>
+            <span class="analysis-result__score-ratio">{{ score.ratio|floatformat:0 }}%</span>
+        </div>
+        {% endfor %}
+    </section>
+
+    <section class="analysis-result__section">
+        <h2 class="analysis-result__heading">스타일 해석</h2>
+        <p class="analysis-result__interpretation">{{ analysis.interpretation }}</p>
+    </section>
+
+    <section class="analysis-result__section">
+        <h2 class="analysis-result__heading">탐지된 아이템</h2>
+        <ul class="analysis-result__items">
+            {% for item in items %}
+            <li class="analysis-result__item">
+                <span class="analysis-result__badge analysis-result__badge--inline">{{ forloop.counter }}</span>  {# 사진 위 박스와 같은 번호 #}
+                <div class="analysis-result__item-text">
+                    <span class="analysis-result__item-category">{{ item.category }}</span>
+                    {% if item.label %}<span class="analysis-result__item-label">{{ item.label }}</span>{% endif %}  {# 라벨이 없으면 카테고리만 #}
+                </div>
+                {% if item.search_url %}                              {# 검색 링크가 있을 때만 버튼 표시 #}
+                <a href="{{ item.search_url }}" target="_blank" rel="noopener" class="btn btn--ghost">쇼핑 검색</a>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+{% elif analysis.status == "failed" %}                                {# 실패 상태면 에러 메시지 #}
+    <p class="analysis-placeholder__desc">분석에 실패했습니다: {{ analysis.error_message }}</p>
+
+{% else %}                                                            {# 대기중/분석중이면 폴링 #}
+    <div class="analysis-polling" data-status-url="{% url 'analysis:status' analysis.id %}">
+        <p class="analysis-placeholder__desc">분석 중입니다... 완료되면 자동으로 새로고침됩니다.</p>
+    </div>
+{% endif %}
+
+{% endwith %}
