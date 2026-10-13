@@ -25,9 +25,8 @@ def run_analysis(analysis_id):
         status=Analysis.STATUS_PROCESSING                             # "대기중"일 때만 "분석중"으로 변경
     )
 
-    image_field = analysis.image if analysis.image else analysis.post.image
-    # A 플로우(게시물 기반)면 analysis.image가 비어있어서 analysis.post.image를 씀,
-    # B 플로우(독립 업로드)면 analysis.image가 있으니 그걸 그대로 씀
+    image_field = analysis.source_image  # 게시물 기반이면 게시물 사진, 독립 업로드면 업로드한 사진 (models.py 참고)
+
 
     callback_url = f"{settings.INTERNAL_BASE_URL}/analysis/api/{analysis.id}/callback/"  # 결과를 돌려받을 Django 콜백 주소
     analyze_url = f"{settings.CV_SERVICE_BASE_URL}/analyze"                                # FastAPI의 분석 요청 주소
