@@ -6,6 +6,13 @@ from .callback import send_callback  # Django로 결과 POST 보내는 함수
 from .detection import detect_items  # ①탐지: 박스+카테고리
 from .labeling import label_items, merge_duplicates  # ②세부분류: 박스에 세부 라벨 붙이기 + 중복 합치기
 from .interpretation import interpret_style  # ③해석: 스타일 비율 + 해석 텍스트 (Gemini)
+import logging  # 파이썬 기본 기록 도구
+
+
+logging.basicConfig(  # 서버가 시작될 때 한 번만 하는 기록 설정 (이게 없으면 시각/단계/이름이 안 붙음)
+    level=logging.INFO,  # 정보 단계 이상(정보/경고/에러)을 모두 기록
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",  # 한 줄 모양: 시각 / 단계 / 어느 파일인지 / 내용
+)
 
 app = FastAPI()
 

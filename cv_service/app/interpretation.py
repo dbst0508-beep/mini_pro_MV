@@ -1,5 +1,6 @@
 import base64  # 이미지(바이트)를 글자(문자열)로 바꿔서 API에 실어 보낼 때 씀
 import io  # 파일로 저장하지 않고 메모리 안에서 이미지를 JPEG로 변환할 때 씀
+import logging  # print 대신 쓰는 파이썬 기본 기록 도구 (중요도 단계와 시각이 자동으로 붙음)
 from typing import List  # "이건 리스트 타입이다"라고 표시할 때 씀
 from google import genai  # Gemini API 공식 라이브러리
 from google.genai import types  # 접속 옵션(재시도 횟수 등)을 정하는 도구
@@ -8,6 +9,8 @@ from pydantic import BaseModel, Field  # LLM이 돌려줄 답의 "모양"을 정
 MODEL_NAME = "gemini-3.8-flash"  # 사용할 Gemini 모델 (무료 등급 제공)
 FALLBACK_INTERPRETATION = "스타일 해석을 생성하지 못했습니다. 잠시 후 다시 분석을 요청해 주세요."  # LLM 호출 실패 시 대신 보여줄 문구
 MAX_LABEL_LENGTH = 15  # ★ 라벨 최대 글자 수 (한글은 URL에 넣으면 9배로 길어져서, 쇼핑 검색 링크가 DB 한도 200자를 넘지 않게)
+
+logger = logging.getLogger(__name__)  # 이 파일 전용 기록 담당자 (이름이 "app.interpretation"으로 붙어서 어느 파일의 로그인지 알 수 있음)
 
 LLM_TIMEOUT = 30  # Gemini 답을 기다리는 최대 시간(초). 넘으면 포기하고 탐지 결과만 돌려줌
 
@@ -81,9 +84,12 @@ def normalize_scores(scores):
     if total == 0:
         return []  # 쓸 수 있는 결과가 하나도 없으면 빈 리스트
 
+    names = list(merged)  # 스타일 이름만 순서대로 꺼낸 리스트 (dict를 list로 바꾸면 키만 남음)
+    ratios = [round(merged[name] / total * 100, 1) for name in names[:-1]]  # 마지막 하나를 뺀 나머지만 전체 대비 비율로 계산 + 반올림
+    ratios.append(round(100.0 - sum(ratios), 1))  # 마지막 스타일은 "100 - 나머지 합"으로 채워서 합이 정확히 100이 되게 함
     return [
-        {"style_name": name, "ratio": round(ratio / total * 100, 1)}  # 전체 대비 비율로 다시 계산
-        for name, ratio in merged.items()
+        {"style_name": name, "ratio": ratio}  # 이름과 비율을 한 묶음(dict)으로
+        for name, ratio in zip(names, ratios)  # zip: 두 리스트를 같은 순서끼리 짝지어 하나씩 꺼냄
     ]
 
 
@@ -114,7 +120,7 @@ def interpret_style(image, items):
         )
         result = StyleAnalysisResult.model_validate_json(interaction.output_text)  # JSON 글자 → 파이썬 객체 (모양이 틀리면 에러)
     except Exception as error:  # 한도 초과, 네트워크 오류, 이상한 응답 등 뭐가 터져도
-        print(f"[interpret_style] LLM 호출 실패: {error}")  # 서버 로그에 원인만 남기고
+        logger.warning("LLM 호출 실패: %s", error)  # 경고 단계로 기록 (분석은 계속되므로 에러가 아니라 경고)
         return [], FALLBACK_INTERPRETATION  # 탐지 결과는 살릴 수 있게 빈 값으로 돌려줌
 
     apply_labels(items, result.item_labels)  # ★ 성공했을 때만 실행됨 → 실패 시엔 FashionCLIP 라벨이 그대로 남음

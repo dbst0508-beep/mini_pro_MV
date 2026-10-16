@@ -64,6 +64,17 @@ class NormalizeScoresTests(unittest.TestCase):  # normalize_scores 함수 테스
         result = normalize_scores(scores)
 
         self.assertEqual(result, [])  # 0으로 나누다 에러 나지 않고 빈 리스트
+
+    def test_ratios_always_sum_to_100(self):
+        """같은 비율 3개처럼 반올림 오차가 생겨도 합은 정확히 100이 된다"""
+        scores = make_scores(("캐주얼", 1), ("미니멀", 1), ("스트릿", 1))  # 각각 33.333...%가 되는 입력
+
+        result = normalize_scores(scores)  # 테스트할 함수 실행
+
+        ratios = [score["ratio"] for score in result]  # 결과에서 비율 숫자만 꺼냄
+        self.assertEqual(ratios, [33.3, 33.3, 33.4])  # 마지막 스타일이 남은 0.1을 가져감
+        self.assertEqual(round(sum(ratios), 1), 100.0)  # 합이 100 (소수 계산의 아주 작은 오차는 반올림으로 무시)
+
 def make_items():
     """탐지 결과처럼 생긴 아이템 2개를 새로 만들어 주는 도우미 (테스트마다 깨끗한 새것을 쓰려고 함수로 만듦)"""
     return [
@@ -130,11 +141,13 @@ class InterpretStyleTests(unittest.TestCase):  # interpret_style 함수 테스�
         mock_client.interactions.create.side_effect = Exception("503 서버 혼잡")  # 가짜에게 "부르면 에러를 내라"고 시킴
         items = make_detected_items()
 
-        style_scores, interpretation = interpret_style(self.image, items)
+        with self.assertLogs("app.interpretation", level="WARNING") as logs:  # 이 블록 안에서 남은 경고 로그를 화면에 안 찍고 붙잡아 둠 (하나도 안 남으면 테스트 실패)
+            style_scores, interpretation = interpret_style(self.image, items)  # 테스트할 함수 실행
 
         self.assertEqual(style_scores, [])  # 스타일 비율은 비어 있음
         self.assertEqual(interpretation, FALLBACK_INTERPRETATION)  # 해석 자리엔 대체 문구
         self.assertEqual(items[0]["label"], "티셔츠")  # FashionCLIP 라벨이 살아 있음
+        self.assertIn("503 서버 혼잡", logs.output[0])  # 붙잡은 첫 로그에 실패 원인이 담겨 있는지 확인
 
     def test_success_returns_scores_and_applies_labels(self, mock_client):
         """Gemini가 성공하면 정리된 비율과 해석을 돌려주고, 라벨을 Gemini 것으로 바꾼다"""
@@ -160,7 +173,8 @@ class InterpretStyleTests(unittest.TestCase):  # interpret_style 함수 테스�
         """Gemini가 약속한 모양이 아닌 답을 주면 실패로 처리한다"""
         mock_client.interactions.create.return_value.output_text = "JSON이 아닌 그냥 글"  # 엉뚱한 답
 
-        style_scores, interpretation = interpret_style(self.image, make_detected_items())
+        with self.assertLogs("app.interpretation", level="WARNING"):  # 이 테스트가 일으키는 경고 로그를 화면에 안 찍고 붙잡음
+            style_scores, interpretation = interpret_style(self.image, make_detected_items())  # 테스트할 함수 실행
 
         self.assertEqual(style_scores, [])
         self.assertEqual(interpretation, FALLBACK_INTERPRETATION)
@@ -169,7 +183,9 @@ class InterpretStyleTests(unittest.TestCase):  # interpret_style 함수 테스�
         """Gemini를 부를 때 제한 시간을 함께 넘긴다 (오늘 고친 부분이 실수로 지워지지 않게 지킴)"""
         mock_client.interactions.create.side_effect = Exception("실패")  # 결과는 중요하지 않으니 바로 실패시킴
 
-        interpret_style(self.image, make_detected_items())
+        with self.assertLogs("app.interpretation", level="WARNING"):  # 이 테스트가 일으키는 경고 로그를 화면에 안 찍고 붙잡음
+            interpret_style(self.image, make_detected_items())  # 테스트할 함수 실행
+
 
         called_with = mock_client.interactions.create.call_args.kwargs  # 가짜가 "어떤 옵션으로 불렸는지" 기록해 둔 것
         self.assertEqual(called_with["timeout"], LLM_TIMEOUT)  # timeout=30으로 불렸는지 확인
