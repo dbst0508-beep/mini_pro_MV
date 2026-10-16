@@ -64,6 +64,17 @@ class NormalizeScoresTests(unittest.TestCase):  # normalize_scores 함수 테스
         result = normalize_scores(scores)
 
         self.assertEqual(result, [])  # 0으로 나누다 에러 나지 않고 빈 리스트
+
+    def test_ratios_always_sum_to_100(self):
+        """같은 비율 3개처럼 반올림 오차가 생겨도 합은 정확히 100이 된다"""
+        scores = make_scores(("캐주얼", 1), ("미니멀", 1), ("스트릿", 1))  # 각각 33.333...%가 되는 입력
+
+        result = normalize_scores(scores)  # 테스트할 함수 실행
+
+        ratios = [score["ratio"] for score in result]  # 결과에서 비율 숫자만 꺼냄
+        self.assertEqual(ratios, [33.3, 33.3, 33.4])  # 마지막 스타일이 남은 0.1을 가져감
+        self.assertEqual(round(sum(ratios), 1), 100.0)  # 합이 100 (소수 계산의 아주 작은 오차는 반올림으로 무시)
+
 def make_items():
     """탐지 결과처럼 생긴 아이템 2개를 새로 만들어 주는 도우미 (테스트마다 깨끗한 새것을 쓰려고 함수로 만듦)"""
     return [

@@ -81,9 +81,12 @@ def normalize_scores(scores):
     if total == 0:
         return []  # 쓸 수 있는 결과가 하나도 없으면 빈 리스트
 
+    names = list(merged)  # 스타일 이름만 순서대로 꺼낸 리스트 (dict를 list로 바꾸면 키만 남음)
+    ratios = [round(merged[name] / total * 100, 1) for name in names[:-1]]  # 마지막 하나를 뺀 나머지만 전체 대비 비율로 계산 + 반올림
+    ratios.append(round(100.0 - sum(ratios), 1))  # 마지막 스타일은 "100 - 나머지 합"으로 채워서 합이 정확히 100이 되게 함
     return [
-        {"style_name": name, "ratio": round(ratio / total * 100, 1)}  # 전체 대비 비율로 다시 계산
-        for name, ratio in merged.items()
+        {"style_name": name, "ratio": ratio}  # 이름과 비율을 한 묶음(dict)으로
+        for name, ratio in zip(names, ratios)  # zip: 두 리스트를 같은 순서끼리 짝지어 하나씩 꺼냄
     ]
 
 
