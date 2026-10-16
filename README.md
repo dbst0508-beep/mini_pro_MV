@@ -85,9 +85,10 @@ media/          # 업로드된 게시물 이미지
 - `app/ml_models.py` — 서버 기동 시 모델을 한 번만 로딩 (모듈 레벨 로딩, 요청마다 재로딩 방지)
 - `app/detection.py` — 객체 탐지 모델(`yainage90/fashion-object-detection`, conditional-detr-resnet-50 파인튜닝)로 옷 아이템의 바운딩박스 + 큰 카테고리(상의/하의/아우터/원피스/신발/가방/모자) 탐지, 0~1 정규화 좌표로 변환
 - `app/labeling.py` — 탐지된 박스 영역을 크롭해 세부 라벨링 모델(`patrickjohncyh/fashion-clip`)로 zero-shot 세부 분류 (카테고리별 한글 후보 라벨 목록 기반). Gemini 호출이 실패했을 때 쓰는 예비 라벨 역할이며, 카테고리와 라벨이 같은 중복 아이템(좌우 신발 등)을 합치는 `merge_duplicates`도 포함
-- `app/interpretation.py` — 사진과 탐지 결과(번호·카테고리·위치)를 Gemini에 보내 스타일 비율(`style_scores`), 해석 텍스트(`interpretation`), 아이템별 세부 라벨을 한 번의 호출로 생성. 구조화 출력(JSON 스키마)을 사용하고, 스타일 이름 중복 병합과 비율 합 100 정규화를 거침
+- `app/interpretation.py` — 사진과 탐지 결과(번호·카테고리·위치)를 Gemini에 보내 스타일 비율(`style_scores`), 해석 텍스트(`interpretation`), 아이템별 세부 라벨을 한 번의 호출로 생성. 구조화 출력(JSON 스키마)을 사용하고, 스타일 이름 중복 병합과 비율 합 100 정규화를 거침 (반올림 오차는 마지막 스타일이 남은 값을 가져가 합이 정확히 100이 됨)
 - Gemini 호출이 성공하면 세부 라벨을 Gemini 결과로 덮어쓰고, 실패하면 FashionCLIP 라벨과 안내 문구로 대체해 탐지 결과는 그대로 저장
 - Gemini 응답 지연 대비: 요청 한 번당 30초 제한(`LLM_TIMEOUT`), 서버 혼잡(503) 시 재시도 1회(`LLM_RETRY_ATTEMPTS`)로 제한 → Gemini가 응답하지 않아도 약 1분 안에 탐지 결과만으로 분석이 완료됨 (제한이 없을 때는 Celery의 300초 제한에 걸려 분석 전체가 실패했음)
+- 로그: `app/main.py`의 `logging.basicConfig`로 `시각 단계 파일이름: 내용` 형식을 설정하고, Gemini 호출 실패는 `logger.warning`으로 기록
 - API 키는 `cv_service/.env`의 `GEMINI_API_KEY`로 관리 (깃 추적 제외)
 
 
@@ -147,11 +148,12 @@ cd cv_service
 uv run --env-file .env python -m unittest -v
 ```
 
-- cv_service: 스타일 비율 정리(`normalize_scores`), 라벨 적용(`apply_labels`), 중복 아이템 병합(`merge_duplicates`), Gemini 호출의 성공·실패·잘못된 응답·제한 시간 전달(`interpret_style`) 테스트 (17개)
-  - Gemini 접속 객체를 `unittest.mock`으로 대체하므로 인터넷 연결이나 API 사용량 없이 실행됩니다 (모듈을 불러올 때 API 키를 읽으므로 `--env-file .env`는 필요).
+- cv_service: 스타일 비율 정리(`normalize_scores`), 라벨 적용(`apply_labels`), 중복 아이템 병합(`merge_duplicates`), Gemini 호출의 성공·실패·잘못된 응답·제한 시간 전달·실패 로그 기록(`interpret_style`), `/analyze` 전체 흐름(콜백 데이터 구성·검색 링크·중복 병합·콜백 실패 시 500) 테스트 (23개)
+  - Gemini 접속 객체와 탐지·라벨링·콜백 전송을 `unittest.mock`으로 대체하므로 인터넷 연결이나 API 사용량 없이 실행됩니다 (모듈을 불러올 때 API 키를 읽으므로 `--env-file .env`는 필요).
 
 ## 참고
 
+- 모델 설계(ERD)는 [`docs/erd.md`](docs/erd.md)에 있습니다.
 - `LANGUAGE_CODE`, `TIME_ZONE`은 한국(`ko-kr`, `Asia/Seoul`) 기준으로 설정되어 있습니다.
 - `SECRET_KEY`는 개발용 기본값이며, 배포 전 환경 변수 등으로 교체가 필요합니다.
 - 이미지 분석을 담당할 `cv_service`(FastAPI)는 이 저장소에 포함되어 있으며, 실제 객체 탐지 + 세부 라벨링 모델이 동작합니다. 스타일 비율/해석 텍스트/세부 라벨은 Gemini API로 생성하며, Django ↔ FastAPI 간 비동기 요청→콜백→상태 전환 전체 흐름은 검증된 상태입니다.
