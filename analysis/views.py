@@ -1,3 +1,5 @@
+import logging                                              # print 대신 쓰는 기록 도구 (실패 원인을 남길 때 씀)
+from django.db import transaction                           # 여러 DB 저장을 "전부 성공 아니면 전부 취소"로 묶는 도구
 import secrets                                              # 랜덤한 콜백 토큰을 만드는 표준 라이브러리
 from datetime import timedelta                              # "6분" 같은 시간 간격을 표현할 때 씀
 from django.utils import timezone                            # 현재 시각을 가져올 때 씀
@@ -13,8 +15,11 @@ from .models import Analysis, DetectedItem, StyleScore      # 이 view에서 쓸
 
 STALE_AFTER = timedelta(minutes=6)  # 요청 후 이 시간이 지나도 안 끝나면 실패로 봄 (Celery의 최대 대기 5분보다 길게)
 
-def home(request):
-    return render(request, "analysis/home.html")
+logger = logging.getLogger(__name__)  # 이 파일 전용 기록 담당자 (이름은 "analysis.views"가 됨)
+
+def home(request):                                          # AI 분석 탭의 첫 화면 (사진 업로드 폼)
+    return render(request, "analysis/home.html")              # analysis/home.html 템플릿을 화면으로 보여줌
+
 
 @csrf_exempt                                                  # CSRF 토큰 검사 생략 (콜백_token으로 대신 검증하니까)
 @require_POST                                                  # POST 요청만 허용, 다른 방식이면 405 에러
@@ -26,30 +31,36 @@ def analysis_callback(request, analysis_id):
     if data.get("callback_token") != analysis.callback_token:     # 요청에 실린 토큰과 DB에 저장된 토큰 비교
         return JsonResponse({"error": "invalid token"}, status=403)  # 안 맞으면 403(권한 없음)으로 거부하고 종료
 
-    for item in data.get("detected_items", []):                    # 검출된 아이템 목록을 하나씩 순회 (없으면 빈 리스트)
-        DetectedItem.objects.create(                                 # 각 아이템마다 DetectedItem 레코드 새로 생성
-            analysis=analysis,                                         # 어느 분석에 속하는지 연결
-            category=item["category"],                                 # 필수값이라 없으면 에러 나게 그냥 []로 접근
-            label=item.get("label", ""),                                # 선택값이라 없으면 빈 문자열 기본값
-            bbox_x=item["bbox_x"],
-            bbox_y=item["bbox_y"],
-            bbox_width=item["bbox_width"],
-            bbox_height=item["bbox_height"],
-            search_url=item.get("search_url", ""),
-        )
+    try:                                                           # 저장 중 어떤 에러가 나도 아래 except가 받도록 감싸기 시작
+        with transaction.atomic():                                   # 이 블록 안의 저장을 한 묶음으로: 중간에 에러가 나면 안에서 저장한 것이 전부 취소됨
+            for item in data.get("detected_items", []):                # 검출된 아이템 목록을 하나씩 순회 (없으면 빈 리스트)
+                DetectedItem.objects.create(                             # 각 아이템마다 DetectedItem 레코드 새로 생성
+                    analysis=analysis,                                     # 어느 분석에 속하는지 연결
+                    category=item["category"],                             # 필수값이라 없으면 에러 나게 그냥 []로 접근
+                    label=item.get("label", ""),                            # 선택값이라 없으면 빈 문자열 기본값
+                    bbox_x=item["bbox_x"],
+                    bbox_y=item["bbox_y"],
+                    bbox_width=item["bbox_width"],
+                    bbox_height=item["bbox_height"],
+                    search_url=item.get("search_url", ""),
+                )
 
-    for score in data.get("style_scores", []):                       # 스타일 비율 목록도 동일하게 순회
-        StyleScore.objects.create(
-            analysis=analysis,
-            style_name=score["style_name"],
-            ratio=score["ratio"],
-        )
+            for score in data.get("style_scores", []):                  # 스타일 비율 목록도 동일하게 순회
+                StyleScore.objects.create(
+                    analysis=analysis,
+                    style_name=score["style_name"],
+                    ratio=score["ratio"],
+                )
 
-    analysis.interpretation = data.get("interpretation", "")           # LLM 해석 텍스트 채우기
-    analysis.status = Analysis.STATUS_COMPLETED                          # 상태를 "완료"로 변경 (models.py에서 정의한 상수 재사용)
-    analysis.save()                                                       # 변경사항 DB에 저장
+            analysis.interpretation = data.get("interpretation", "")     # LLM 해석 텍스트 채우기
+            analysis.status = Analysis.STATUS_COMPLETED                    # 상태를 "완료"로 변경
+            analysis.save()                                                 # 변경사항 DB에 저장 (여기까지 와야 묶음 전체가 확정됨)
+    except Exception:                                                  # 묶음 안에서 무슨 에러가 나도 (이 시점엔 이미 전부 되돌려진 상태)
+        logger.exception("분석 #%s 결과 저장 실패", analysis.id)         # 실패 원인(에러 내용과 위치)을 로그에 남김
+        mark_failed(analysis.id, "분석 결과를 저장하지 못했습니다. 다른 사진으로 다시 시도해 주세요.")  # 분석을 바로 "실패"로 표시 (6분 기다리지 않게)
+        return JsonResponse({"error": "failed to save result"}, status=500)  # 보낸 쪽(cv_service)에도 실패를 알림
 
-    return JsonResponse({"ok": True})                                     # 처리 성공 응답
+    return JsonResponse({"ok": True})                                   # 처리 성공 응답
 
 @login_required                                              # 로그인 안 했으면 여기 도달 전에 로그인 페이지로 리다이렉트
 @require_POST                                                  # 버튼 누르는 폼의 POST 요청만 허용
