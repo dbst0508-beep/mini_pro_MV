@@ -215,28 +215,33 @@ class RunAnalysisTests(AnalysisTestCase):
 
     def test_connection_error_marks_failed(self, mock_post):
         mock_post.side_effect = requests.exceptions.ConnectionError("서버 꺼짐")  # 가짜가 불리면 "연결 실패" 예외를 일으키게 설정
-        run_analysis(self.analysis.id)
+        with self.assertLogs("analysis.tasks", level="ERROR") as logs:  # 이 블록 안에서 남은 에러 로그를 화면에 안 찍고 붙잡아 둠 (하나도 안 남으면 테스트 실패)
+            run_analysis(self.analysis.id)  # 테스트할 task 실행
 
-        self.analysis.refresh_from_db()
-        self.assertEqual(self.analysis.status, Analysis.STATUS_FAILED)
+        self.analysis.refresh_from_db()  # task가 DB를 바꿨으니 최신 상태를 다시 읽어옴
+        self.assertEqual(self.analysis.status, Analysis.STATUS_FAILED)  # 분석이 "실패"로 바뀌었는지
         self.assertIn("연결할 수 없습니다", self.analysis.error_message)  # 연결 실패용 문구여야 함
+        self.assertIn("연결 실패", logs.output[0])  # 붙잡은 첫 로그에 "연결 실패"가 있는지 (로그가 실제로 남았는지 확인)
 
     def test_timeout_marks_failed(self, mock_post):
         mock_post.side_effect = requests.exceptions.Timeout("응답 없음")  # "시간 초과" 예외를 일으키게 설정
-        run_analysis(self.analysis.id)
+        with self.assertLogs("analysis.tasks", level="ERROR") as logs:  # 에러 로그를 붙잡아 둠
+            run_analysis(self.analysis.id)
 
         self.analysis.refresh_from_db()
         self.assertEqual(self.analysis.status, Analysis.STATUS_FAILED)
         self.assertIn("시간이 초과", self.analysis.error_message)  # 시간 초과용 문구여야 함
-
+        self.assertIn("시간 초과", logs.output[0])  # 로그에도 "시간 초과"가 남았는지
 
     def test_error_response_marks_failed(self, mock_post):
         mock_post.return_value.raise_for_status.side_effect = requests.exceptions.HTTPError("500")  # 응답은 왔지만 에러 응답인 상황
-        run_analysis(self.analysis.id)
+        with self.assertLogs("analysis.tasks", level="ERROR") as logs:  # 에러 로그를 붙잡아 둠 (traceback이 화면에 쏟아지는 것도 막아 줌)
+            run_analysis(self.analysis.id)
 
         self.analysis.refresh_from_db()
         self.assertEqual(self.analysis.status, Analysis.STATUS_FAILED)
         self.assertIn("오류가 발생", self.analysis.error_message)  # 그 밖의 오류용 문구여야 함
+        self.assertIn("오류", logs.output[0])  # 로그에도 "오류"가 남았는지
 
 # 결과 페이지 테스트 코드 (게시물 기반)
 class ResultViewTests(AnalysisTestCase):
