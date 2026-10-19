@@ -138,3 +138,27 @@ CELERY_RESULT_SERIALIZER = "json"                           # 결과 직렬화 �
 INTERNAL_BASE_URL = "http://localhost:8000"
  # CV 분석을 맡은 FastAPI 서버 주소 (cv_service/, 8001번 포트)
 CV_SERVICE_BASE_URL = "http://localhost:8001"
+
+# 로그 설정: analysis 앱의 로그(logger.error 등)를 "시각 단계 파일이름: 내용" 모양으로 터미널에 출력
+LOGGING = {
+    "version": 1,                                         # 설정 형식의 버전 (지금은 항상 1로 적는 것이 약속)
+    "disable_existing_loggers": False,                    # 이미 만들어진 다른 로거(Django 자체 로그 등)를 끄지 않음 (True면 기존 로그가 사라질 수 있음)
+    "formatters": {                                       # 출력 모양 정의
+        "basic": {                                          # 이 모양의 이름: "basic"
+            "format": "%(asctime)s %(levelname)s %(name)s: %(message)s",  # 한 줄 모양: 시각 / 단계 / 어느 파일인지 / 내용 (cv_service와 같은 형식)
+        },
+    },
+    "handlers": {                                         # 로그를 어디로 내보낼지 정의
+        "console": {                                        # 이 출구의 이름: "console"
+            "class": "logging.StreamHandler",                 # 터미널 화면으로 출력하는 파이썬 기본 도구
+            "formatter": "basic",                             # 위에서 정의한 "basic" 모양으로 출력
+        },
+    },
+    "loggers": {                                          # 어느 로거에 어떤 출구를 연결할지 정의
+        "analysis": {                                       # "analysis"로 시작하는 로거 전부 (analysis.views, analysis.tasks)
+            "handlers": ["console"],                          # 위의 "console" 출구에 연결
+            "level": "INFO",                                  # 정보 단계 이상(정보/경고/에러)을 출력
+            "propagate": False,                               # 상위(루트) 로거로 다시 넘기지 않음: 같은 로그가 두 번 찍히는 것을 막음
+        },
+    },
+}
