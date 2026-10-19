@@ -4,6 +4,10 @@ from django.conf import settings                               # settings.py에 
 
 from .models import Analysis                                    # analysis_id로 레코드 조회할 때 씀
 
+import logging                                              # print 대신 쓰는 기록 도구 (시각과 심각도가 붙음)
+
+logger = logging.getLogger(__name__)  # 이 파일 전용 기록 담당자 (이름은 "analysis.tasks"가 됨)
+
 ANALYZE_TIMEOUT = (5, 300)  # (연결 대기 5초, 응답 대기 300초) — 서버 켠 직후 첫 분석은 몇 분 걸릴 수 있어 넉넉하게
 
 
@@ -44,11 +48,11 @@ def run_analysis(analysis_id):
             )
         response.raise_for_status()                                         # 응답이 에러(4xx/5xx)면 예외를 일으킴
     except requests.exceptions.ConnectionError as error:                  # 서버가 꺼져 있어 연결 자체가 안 될 때
-        print(f"[run_analysis] #{analysis_id} 연결 실패: {error}")
+        logger.error("분석 #%s 연결 실패: %s", analysis_id, error)          # 에러 단계로 기록: %s 자리에 뒤의 값들이 순서대로 들어감
         mark_failed(analysis_id, "분석 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.")
     except requests.exceptions.Timeout as error:                           # 제한 시간 안에 답이 안 올 때
-        print(f"[run_analysis] #{analysis_id} 시간 초과: {error}")
+        logger.error("분석 #%s 시간 초과: %s", analysis_id, error)          # 이것도 원인이 뻔하므로 에러 단계 + 한 줄이면 충분함
         mark_failed(analysis_id, "분석 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.")
     except Exception as error:                                              # 그 밖의 모든 문제 (서버 에러 응답, 이미지 파일 없음 등)
-        print(f"[run_analysis] #{analysis_id} 오류: {error}")
+        logger.exception("분석 #%s 오류", analysis_id)                       # 에러 내용과 발생 위치(traceback)까지 자동으로 같이 기록함
         mark_failed(analysis_id, "분석 중 오류가 발생했습니다. 다른 사진으로 다시 시도해 주세요.")
