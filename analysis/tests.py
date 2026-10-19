@@ -94,6 +94,22 @@ class AnalysisCallbackTests(AnalysisTestCase):
         response = self.client.get(self.url)  # POST가 아니라 GET으로 접근
         self.assertEqual(response.status_code, 405)  # "허용되지 않은 방식"으로 거부돼야 함
 
+    def test_save_failure_rolls_back_everything_and_marks_failed(self):
+        self.payload["style_scores"] = [  # 같은 스타일 이름을 두 번 보냄: DB의 중복 금지 규칙(unique_together)에 걸려 두 번째 저장에서 에러가 남
+            {"style_name": "캐주얼", "ratio": 60.0},
+            {"style_name": "캐주얼", "ratio": 40.0},
+        ]
+
+        with self.assertLogs("analysis.views", level="ERROR"):  # 실패 로그를 화면에 안 찍고 붙잡아 둠
+            response = self.post_callback(self.payload)  # 콜백 요청 보내기
+
+        self.assertEqual(response.status_code, 500)  # 보낸 쪽에 실패를 알려야 함
+        self.analysis.refresh_from_db()  # 뷰가 DB를 바꿨으니 최신 상태를 다시 읽어옴
+        self.assertEqual(self.analysis.detected_items.count(), 0)  # 아이템은 먼저 저장됐었지만 되돌려져서 0개여야 함
+        self.assertEqual(self.analysis.style_scores.count(), 0)  # 첫 번째 스타일도 되돌려져서 0개여야 함
+        self.assertEqual(self.analysis.status, Analysis.STATUS_FAILED)  # 분석은 "실패"로 표시돼야 함
+        self.assertIn("저장하지 못했습니다", self.analysis.error_message)  # 안내 문구가 저장돼야 함
+
 
 # 분석 요청 테스트 코드 (게시물 기반 A 플로우 + 독립 업로드 B 플로우)
 @patch("analysis.views.run_analysis")  # 이 클래스의 테스트 동안 views.py의 run_analysis를 가짜로 바꿈 → 각 테스트가 mock_task로 받음
