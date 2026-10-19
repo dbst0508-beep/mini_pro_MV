@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os                                                 # 환경변수(os.environ)를 읽기 위해 os 모듈 불러오기
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +26,7 @@ SECRET_KEY = 'django-insecure-j&kpfpkj!6cpw+zx)77m)3)j-&k2wq%cg!@^^ln9pak!lr%x=&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "web"]        # 접속을 허용할 주소 목록. "web"은 cv_service가 콜백할 때 쓰는 compose 서비스 이름이라 꼭 필요함
 
 
 # Application definition
@@ -127,17 +128,17 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Celery
-CELERY_BROKER_URL = "redis://localhost:6379/0"        # 작업 큐로 쓸 Redis 주소 (DB 인덱스 0번)
-CELERY_RESULT_BACKEND = "redis://localhost:6379/0"     # 작업 결과 저장도 같은 Redis에 (지금 단계에선 결과 조회 안 쓰지만 기본값으로 설정)
+CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")      # 환경변수 REDIS_URL이 있으면 그 값, 없으면 기존 localhost 값 사용 (작업 큐)
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://localhost:6379/0")  # 결과 저장소도 같은 방식으로 환경변수 우선
 CELERY_ACCEPT_CONTENT = ["json"]                          # task 인자/결과를 json으로만 주고받음 (보안상 pickle 금지)
 CELERY_TASK_SERIALIZER = "json"                            # task 인자 직렬화 방식
 CELERY_RESULT_SERIALIZER = "json"                           # 결과 직렬화 방식
 
 # 콜백 URL 조립에 쓸 내부 서버 주소 (지금은 Celery task가 Django 자기 자신을 호출하는 데 사용,
 # 나중에 실제 FastAPI가 이 자리를 대체할 때는 FastAPI 쪽 설정이 되므로 여기선 그대로 둠)
-INTERNAL_BASE_URL = "http://localhost:8000"
+INTERNAL_BASE_URL = os.environ.get("INTERNAL_BASE_URL", "http://localhost:8000")  # 콜백 주소의 기준. compose에서는 http://web:8000으로 덮어씀
  # CV 분석을 맡은 FastAPI 서버 주소 (cv_service/, 8001번 포트)
-CV_SERVICE_BASE_URL = "http://localhost:8001"
+CV_SERVICE_BASE_URL = os.environ.get("CV_SERVICE_BASE_URL", "http://localhost:8001")  # cv_service 주소. compose에서는 http://cv_service:8001로 덮어씀
 
 # 로그 설정: analysis 앱의 로그(logger.error 등)를 "시각 단계 파일이름: 내용" 모양으로 터미널에 출력
 LOGGING = {
