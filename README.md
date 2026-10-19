@@ -14,6 +14,7 @@ Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일
 - PyTorch + Transformers + timm (`cv_service/` — 객체 탐지/이미지-텍스트 모델 추론)
 - Gemini API (`google-genai`, `gemini-3.8-flash` — 스타일 비율·해석 텍스트·아이템 세부 라벨 생성)
 - 패키지 관리: [uv](https://docs.astral.sh/uv/)
+- Docker + Docker Compose (web / celery / cv_service / redis 4개 컨테이너를 한 번에 실행)
 
 ## 프로젝트 구조
 
@@ -24,6 +25,8 @@ posts/          # 게시물, 댓글, 좋아요 (모델 + DRF API)
 analysis/       #  이미지 스타일 분석 (Celery 비동기 파이프라인, Django 측 로직은 완성 / 실제 CV·LLM은 cv_service 연동)
 config/celery.py  # Celery 앱 설정
 cv_service/     # FastAPI 기반 CV/LLM 분석 서버 (Django와 별도 pyproject.toml/가상환경, 포트 8001). 객체 탐지 + 세부 라벨링 + 비전 LLM(Gemini) 연동 완료
+Dockerfile      # Django + Celery 공용 이미지 (루트), cv_service/Dockerfile은 FastAPI용
+docker-compose.yml  # web, celery, cv_service, redis 4개 서비스 구성
 templates/      # 서버 렌더링 템플릿 (feed, mypage, login, analysis)
 static/         #  CSS(디자인 시스템 변수 기반), JS, 이미지
 media/          # 업로드된 게시물 이미지
@@ -103,7 +106,24 @@ media/          # 업로드된 게시물 이미지
 
 ## 실행 방법
 
-AI 분석 기능은 Redis + Celery worker + cv_service(FastAPI)가 같이 떠 있어야 동작합니다. 터미널 4개를 띄워서 각각 실행하세요.
+AI 분석 기능은 Redis + Celery worker + cv_service(FastAPI)가 같이 떠 있어야 동작합니다.
+
+### 방법 1 — Docker Compose (권장)
+
+한 번에 4개(web, celery, cv_service, redis)가 같이 뜹니다. `cv_service/.env`에 `GEMINI_API_KEY`가 있어야 합니다.
+
+```bash
+docker compose build   # 이미지 만들기 (처음 한 번, 의존성이 바뀌면 다시)
+docker compose up      # 전체 실행 (중지: Ctrl+C, 백그라운드는 -d)
+```
+
+- 접속: Django `http://localhost:8000`, cv_service `http://localhost:8001`
+- 컨테이너끼리는 서비스 이름(`redis`, `web`, `cv_service`)으로 서로를 부르며, `config/settings.py`가 환경변수(`REDIS_URL`, `INTERNAL_BASE_URL`, `CV_SERVICE_BASE_URL`)로 주소를 읽습니다. 환경변수가 없으면 기존 `localhost` 값을 쓰므로 아래 방법 2도 그대로 동작합니다.
+- DB(`db.sqlite3`)와 업로드 이미지(`media/`)는 내 컴퓨터의 파일을 컨테이너에 연결해서 사용합니다. 처음 실행 전에 `db.sqlite3`가 없다면 `python manage.py migrate`로 먼저 만들어 두세요(없으면 Docker가 파일 대신 폴더를 만듭니다).
+
+### 방법 2 — 터미널 4개로 직접 실행
+
+터미널 4개를 띄워서 각각 실행하세요.
 
 ```bash
 # 터미널 1 — Redis (Celery 작업 큐)
@@ -159,6 +179,7 @@ uv run --env-file .env python -m unittest -v
 - `LANGUAGE_CODE`, `TIME_ZONE`은 한국(`ko-kr`, `Asia/Seoul`) 기준으로 설정되어 있습니다.
 - `SECRET_KEY`는 개발용 기본값이며, 배포 전 환경 변수 등으로 교체가 필요합니다.
 - 이미지 분석을 담당할 `cv_service`(FastAPI)는 이 저장소에 포함되어 있으며, 실제 객체 탐지 + 세부 라벨링 모델이 동작합니다. 스타일 비율/해석 텍스트/세부 라벨은 Gemini API로 생성하며, Django ↔ FastAPI 간 비동기 요청→콜백→상태 전환 전체 흐름은 검증된 상태입니다.
-- `cv_service`를 처음 실행하면 허깅페이스에서 모델 가중치를 다운로드하므로 기동에 시간이 걸릴 수 있습니다 (이후엔 로컬 캐시 사용).
+- `cv_service`를 처음 실행하면 허깅페이스에서 모델 가중치를 다운로드하므로 기동에 시간이 걸릴 수 있습니다 (직접 실행 시 이후엔 로컬 캐시 사용). Docker로 실행하면 컨테이너를 새로 만들 때마다 다시 내려받습니다 (모델 캐시 볼륨 연결은 추후 과제).
+- Docker 구성 관련 한계: sqlite 파일을 web과 celery가 함께 쓰므로 동시 쓰기가 겹치면 `database is locked`가 날 수 있고, `depends_on`은 시작 순서만 보장합니다. 서버는 개발용 `runserver`입니다.
 - 알려진 한계: 작은 신발/부츠는 탐지되지 않을 수 있습니다 (탐지 모델이 해당 박스를 낮은 점수로만 인식하며, 기준값 조정으로는 해결되지 않음). Gemini 해석 글에는 언급되지만 박스는 표시되지 않습니다. 근본 해결은 고도화 단계에서 다룹니다.
 - 서버를 켠 직후의 첫 분석은 모델 준비 시간 때문에 1분 이상 걸릴 수 있고, 이후 분석은 수 초 내에 끝납니다.
