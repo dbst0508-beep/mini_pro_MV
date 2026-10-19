@@ -192,7 +192,7 @@ OK
 ```
 
 ### 남은 과제
-- 탐지 기준값(`CONFIDENCE_THRESHOLD = 0.5`) 조정: 신발(워커 부츠)을 탐지하지 못한 사례 (`feature/detection-threshold`)
+- (정정) 작은 신발/부츠 미탐지는 기준값(`CONFIDENCE_THRESHOLD`) 조정으로 해결되지 않는 알려진 한계입니다. 자세한 내용은 `docs/2026-10-19-logging-cleanup.md`의 "알려진 한계" 참고
 - Django 쪽 `analysis/tasks.py`의 `print` 3개를 `logging`으로 교체 (Django 로깅 설정 포함)
 - README의 `## 실행 방법` 제목 위치 정리
 - 배포 방식 결정 및 배포용 설정
