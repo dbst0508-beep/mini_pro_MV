@@ -229,14 +229,6 @@ class RunAnalysisTests(AnalysisTestCase):
         self.assertEqual(self.analysis.status, Analysis.STATUS_FAILED)
         self.assertIn("시간이 초과", self.analysis.error_message)  # 시간 초과용 문구여야 함
 
-    def test_error_response_marks_failed(self, mock_post):
-        mock_post.return_value.raise_for_status.side_effect = requests.exceptions.ConnectionError("서버 꺼짐")  # 가짜가 불리면 "연결 실패" 예외를 일으키게 설정
-        run_analysis(self.analysis.id)
-
-        self.analysis.refresh_from_db()
-        self.assertEqual(self.analysis.status, Analysis.STATUS_FAILED)
-        self.assertIn("연결할 수 없습니다", self.analysis.error_message)  # 연결 실패용 문구여야 함
-
 
     def test_error_response_marks_failed(self, mock_post):
         mock_post.return_value.raise_for_status.side_effect = requests.exceptions.HTTPError("500")  # 응답은 왔지만 에러 응답인 상황
