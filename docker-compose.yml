@@ -3,6 +3,21 @@ services:                                   # 띄울 컨테이너(서비스)들�
   redis:                                    # 서비스 이름. 다른 컨테이너가 "redis"라는 이름으로 이 컨테이너를 찾음
     image: redis:7                          # 직접 빌드하지 않고 공식 Redis 이미지를 그대로 사용
 
+  db:                                       # PostgreSQL 서버 컨테이너. 이름이 "db"라 다른 컨테이너가 "db"로 이 DB를 찾음
+    image: postgres:17                      # 공식 PostgreSQL 이미지를 그대로 사용
+    environment:                            # 이 컨테이너가 처음 켜질 때 DB를 만드는 데 쓰는 값
+      POSTGRES_DB: mom_vision               # 만들어 둘 DB 이름 (settings.py의 NAME과 같아야 함)
+      POSTGRES_USER: postgres               # DB 관리자 사용자 이름
+      POSTGRES_PASSWORD: postgres           # 그 사용자의 비밀번호 (개발용 값. 배포 때는 반드시 바꿀 것)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   # DB 파일이 저장되는 폴더를 이름 있는 볼륨에 연결해 컨테이너를 지워도 데이터가 남게 함
+    healthcheck:                            # "DB가 접속 받을 준비가 됐는지"를 주기적으로 검사하는 설정
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mom_vision"]  # pg_isready: PostgreSQL이 연결 가능한 상태인지 알려 주는 도구
+      interval: 3s                          # 3초마다 검사
+      timeout: 3s                           # 검사 한 번에 최대 3초까지 기다림
+      retries: 10                           # 10번 연속 실패하면 "비정상"으로 판단
+
+
   web:                                      # Django 서버. 이름이 "web"이라 콜백 주소가 http://web:8000이 됨
     build: .                                # 현재 폴더(루트)의 Dockerfile로 이미지를 만듦
     ports:
@@ -11,24 +26,38 @@ services:                                   # 띄울 컨테이너(서비스)들�
       REDIS_URL: redis://redis:6379/0       # localhost 대신 redis 서비스 이름으로 접속
       INTERNAL_BASE_URL: http://web:8000    # 콜백 주소의 기준을 web 서비스로 지정
       CV_SERVICE_BASE_URL: http://cv_service:8001  # cv_service 서비스 이름으로 접속
+      POSTGRES_HOST: db                     # DB 서버 주소 = db 서비스 이름 (이 값이 있으면 settings.py가 PostgreSQL을 사용)
+      POSTGRES_DB: mom_vision               # 접속할 DB 이름
+      POSTGRES_USER: postgres               # 접속할 사용자
+      POSTGRES_PASSWORD: postgres           # 비밀번호 (db 서비스의 값과 같아야 함)
+
     volumes:
-      - ./db.sqlite3:/app/db.sqlite3        # 내 컴퓨터의 DB 파일을 컨테이너에 연결해서 데이터가 유지되게 함
       - ./media:/app/media                  # 업로드된 이미지도 같은 방식으로 연결
     depends_on:
-      - redis                               # redis가 먼저 시작된 뒤에 web을 시작
+      redis:
+        condition: service_started          # redis는 "시작"만 되면 충분
+      db:
+        condition: service_healthy          # db는 위의 healthcheck가 "준비 완료"라고 할 때까지 기다린 뒤 시작
 
   celery:                                   # Celery 워커. web과 같은 코드를 쓰고 실행 명령만 다름
     build: .                                # web과 같은 Dockerfile로 이미지를 만듦
     command: celery -A config worker -l info   # CMD를 덮어써서 Django 서버 대신 Celery 워커를 실행
     environment:                            # web과 같은 환경변수 (워커도 Redis와 서비스 주소를 알아야 함)
+      POSTGRES_HOST: db                     # DB 서버 주소 = db 서비스 이름 (이 값이 있으면 settings.py가 PostgreSQL을 사용)
+      POSTGRES_DB: mom_vision               # 접속할 DB 이름
+      POSTGRES_USER: postgres               # 접속할 사용자
+      POSTGRES_PASSWORD: postgres           # 비밀번호 (db 서비스의 값과 같아야 함)   
       REDIS_URL: redis://redis:6379/0
       INTERNAL_BASE_URL: http://web:8000
       CV_SERVICE_BASE_URL: http://cv_service:8001
     volumes:
-      - ./db.sqlite3:/app/db.sqlite3        # 워커도 같은 DB 파일을 봐야 결과를 저장할 수 있음
       - ./media:/app/media                  # 워커도 같은 이미지 파일을 읽어야 함
     depends_on:
-      - redis                               # redis가 먼저 시작된 뒤에 시작
+      redis:
+        condition: service_started          # redis는 "시작"만 되면 충분
+      db:
+        condition: service_healthy          # db는 위의 healthcheck가 "준비 완료"라고 할 때까지 기다린 뒤 시작
+
 
   cv_service:                               # FastAPI 이미지 분석 서버
     build: ./cv_service                     # cv_service 폴더의 Dockerfile로 이미지를 만듦
@@ -36,3 +65,6 @@ services:                                   # 띄울 컨테이너(서비스)들�
       - ./cv_service/.env                   # GEMINI_API_KEY가 들어 있는 파일. 이미지에는 굽지 않고 실행할 때만 주입됨
     ports:
       - "8001:8001"                         # 내 컴퓨터에서 직접 확인하기 위해 포트 열기
+
+volumes:                                    # compose가 관리하는 이름 있는 볼륨 목록
+  postgres_data:                            # DB 데이터를 보관할 볼륨 (위 db 서비스가 이 이름으로 연결함)

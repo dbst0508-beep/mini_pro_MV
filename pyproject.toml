@@ -9,6 +9,7 @@ dependencies = [
     "django>=6.0.7",
     "djangorestframework>=3.17.1",
     "pillow>=12.3.0",
+    "psycopg[binary]>=3.3.6",
     "redis>=8.1.0",
     "requests>=2.34.2",
 ]

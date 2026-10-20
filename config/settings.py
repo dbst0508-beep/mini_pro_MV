@@ -79,12 +79,25 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.environ.get("POSTGRES_HOST"):                                  # 환경변수 POSTGRES_HOST가 있으면(= Docker 안에서 실행 중이면) PostgreSQL을 사용
+    DATABASES = {                                                     # Django에게 알려 줄 DB 설정 묶음
+        'default': {                                                  # 기본으로 쓸 DB 하나
+            'ENGINE': 'django.db.backends.postgresql',                # 이 DB가 PostgreSQL이라고 알려 주는 접속 모듈 이름
+            'NAME': os.environ.get("POSTGRES_DB", "mom_vision"),      # 사용할 DB 이름 (환경변수가 없으면 mom_vision)
+            'USER': os.environ.get("POSTGRES_USER", "postgres"),      # DB에 접속할 사용자 이름
+            'PASSWORD': os.environ.get("POSTGRES_PASSWORD", ""),      # 그 사용자의 비밀번호
+            'HOST': os.environ["POSTGRES_HOST"],                      # DB 서버 주소 (compose에서는 서비스 이름 db). if에서 있다고 확인했으니 바로 읽음
+            'PORT': os.environ.get("POSTGRES_PORT", "5432"),          # PostgreSQL의 기본 포트
+        }
     }
-}
+else:                                                                 # 환경변수가 없으면(= Docker 없이 로컬 실행) 기존 방식 유지
+    DATABASES = {                                                     # 기존 sqlite 설정 그대로
+        'default': {                                                  # 기본으로 쓸 DB 하나
+            'ENGINE': 'django.db.backends.sqlite3',                   # sqlite3 접속 모듈
+            'NAME': BASE_DIR / 'db.sqlite3',                          # 프로젝트 폴더의 db.sqlite3 파일
+        }
+    }
+
 
 
 # Password validation
