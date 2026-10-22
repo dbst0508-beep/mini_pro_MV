@@ -7,6 +7,7 @@ Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일
 - Python >= 3.12
 - Django >= 6.0.7
 - Django REST Framework >= 3.17.1
+- drf-spectacular (Django API 명세 자동 생성 + Swagger 화면)
 - Pillow (이미지 처리)
 - PostgreSQL 17 (Docker Compose 실행 시 사용) / SQLite (Docker 없이 로컬에서 직접 실행할 때의 기본값)
 - psycopg (Django ↔ PostgreSQL 접속 드라이버)
@@ -55,6 +56,11 @@ media/          # 업로드된 게시물 이미지
   - `GET/POST /api/posts/<post_id>/comments/` — 댓글 목록 조회 / 작성
   - `GET/PUT/PATCH/DELETE /api/posts/<post_id>/comments/<comment_id>/` — 댓글 단건 조회 / 수정 / 삭제 (작성자 본인만 수정·삭제 가능)
   - `POST /api/posts/<post_id>/like/` — 좋아요 토글
+  - 댓글 단건 API는 URL의 `post_id`에 속한 댓글만 대상으로 삼음 (다른 게시물의 댓글 번호를 넣으면 404)
+- API 문서(Swagger): `http://localhost:8000/api/docs/` — 게시물·댓글·좋아요 API를 "게시물/댓글/좋아요" 그룹으로 보여 주고 화면에서 바로 요청을 보낼 수 있음 (명세 원본 데이터는 `/api/schema/`)
+  - 세션 로그인 방식이라 같은 브라우저에서 `/login/`으로 먼저 로그인한 뒤 열면 로그인 상태로 요청됨
+  - 게시물 작성은 파일 선택 버튼으로 이미지 업로드 가능
+  - AI 분석 주소(`/analysis/...`)는 DRF가 아닌 일반 Django 뷰라 이 문서에서 제외. 분석 서버의 API는 `cv_service`의 `http://localhost:8001/docs`에서 확인 (`/analyze`는 실제 분석을 실행하므로 화면에서 Execute는 비권장)
 
 ### analysis
 - `Analysis`: 스타일 분석 요청/상태(`대기중`/`분석중`/`완료`/`실패`) 관리. `post` 또는 `image` 둘 중 하나로 "무엇을 분석하는지" 연결(둘 다 nullable), 콜백 검증용 토큰 보유
@@ -122,7 +128,7 @@ docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
 ```
 
-- 접속: Django `http://localhost:8000`, cv_service `http://localhost:8001`
+- 접속: Django `http://localhost:8000` (API 문서 `/api/docs/`), cv_service `http://localhost:8001` (API 문서 `/docs`)
 - 컨테이너끼리는 서비스 이름(`redis`, `web`, `cv_service`)으로 서로를 부르며, `config/settings.py`가 환경변수(`REDIS_URL`, `INTERNAL_BASE_URL`, `CV_SERVICE_BASE_URL`)로 주소를 읽습니다. 환경변수가 없으면 기존 `localhost` 값을 쓰므로 아래 방법 2도 그대로 동작합니다.
 - DB는 PostgreSQL 컨테이너(`db`)를 사용하고, 데이터는 Docker 볼륨(`postgres_data`)에 저장되어 컨테이너를 지워도 남습니다. `docker compose down -v`는 볼륨까지 지우므로 DB 데이터가 사라집니다. `db`의 포트는 컴퓨터 밖으로 열지 않았으며, 직접 확인하려면 `docker compose exec db psql -U postgres -d mom_vision`을 사용합니다.
 - `config/settings.py`는 환경변수 `POSTGRES_HOST`가 있을 때만 PostgreSQL(`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`)을 사용하고, 없으면 기존 SQLite(`db.sqlite3`)를 사용합니다. 아래 방법 2는 그대로 SQLite로 동작합니다.
@@ -165,7 +171,7 @@ uv run python manage.py test accounts
 uv run python manage.py test analysis
 ```
 
-- posts: 좋아요/댓글 생성·조회·수정·삭제, 게시물 등록 API 테스트 (16개)
+- posts: 좋아요/댓글 생성·조회·수정·삭제, 다른 게시물의 댓글 접근 차단, 게시물 등록 API 테스트 (17개)
 - accounts: 회원가입/로그인/로그아웃/마이페이지 테스트 (13개)
 - analysis: 콜백 토큰 검증·결과 저장(저장 실패 시 전체 롤백 + 실패 처리), 분석 요청 권한(게시물 기반/독립 업로드), 상태 조회의 오래된 분석 실패 전환, 실패 기록 함수, Celery task의 실패 처리(실패 로그 기록 확인 포함), 결과 페이지(사진 표시·재분석 실패 시 이전 결과 표시) 테스트 (19개)
   - Celery와 cv_service 호출은 `unittest.mock`으로 대체하므로 Redis/Celery/cv_service를 켜지 않아도 실행됩니다.
