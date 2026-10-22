@@ -135,6 +135,19 @@ class CommentDetailAPIViewTests(PostsAPITestCase):  # 댓글 상세(조회/수�
         response = self.client.delete(self.url)  # 로그인 없이 삭제 요청
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)  # 위와 동일하게 401이어야 함
         self.assertEqual(Comment.objects.count(), 1)  # 삭제되지 않고 그대로 1개 남아있어야 함
+    def test_comment_of_other_post_is_not_found(self):  # URL의 게시물 번호와 댓글의 실제 게시물이 다르면 "없음(404)"이어야 하는지 확인
+        other_post = Post.objects.create(user=self.user, image="posts/test2.jpg", caption="다른 게시물")  # 댓글이 하나도 없는 다른 게시물
+        wrong_url = f"/api/posts/{other_post.id}/comments/{self.comment.id}/"  # 다른 게시물 번호 + 원래 댓글 번호: 서로 맞지 않는 잘못된 조합
+        self.client.force_authenticate(user=self.user)  # 댓글 작성자 본인으로 로그인 (권한 문제가 아니라 "조합" 문제만 보기 위해)
+
+        self.assertEqual(self.client.get(wrong_url).status_code, status.HTTP_404_NOT_FOUND)  # 조회해도 404여야 함
+        response = self.client.patch(wrong_url, {"content": "엉뚱한 곳에서 수정"})  # 이 주소로 수정을 시도
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)  # 수정도 404로 막혀야 함
+        self.assertEqual(self.client.delete(wrong_url).status_code, status.HTTP_404_NOT_FOUND)  # 삭제도 404로 막혀야 함
+
+        self.comment.refresh_from_db()  # DB 최신 상태 다시 불러오기
+        self.assertEqual(self.comment.content, "원본 댓글")  # 내용이 바뀌지 않고 그대로여야 함
+        self.assertEqual(Comment.objects.count(), 1)  # 삭제되지 않고 그대로 1개 남아 있어야 함
 
 #게시물 등록 테스트 코드
 class PostListCreateAPIViewTests(PostsAPITestCase):  # 게시물 목록 조회/생성 API 테스트 클래스
