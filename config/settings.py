@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'posts',
     'analysis',
     'rest_framework',
+    'drf_spectacular',                                       # API 명세를 자동으로 만들어 주는 앱 (Swagger 화면의 재료를 생산)
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -175,4 +176,17 @@ LOGGING = {
             "propagate": False,                               # 상위(루트) 로거로 다시 넘기지 않음: 같은 로그가 두 번 찍히는 것을 막음
         },
     },
+}
+# API 문서(Swagger) 설정
+REST_FRAMEWORK = {                                           # DRF 전체 설정 묶음 (지금까지는 없어서 기본값만 쓰고 있었음)
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',  # DRF가 API 명세를 만들 때 drf-spectacular의 방식을 쓰도록 지정
+}
+
+
+SPECTACULAR_SETTINGS = {                                     # drf-spectacular 전용 설정 묶음
+    'TITLE': 'mom vision API',                               # Swagger 화면 맨 위에 표시될 제목
+    'DESCRIPTION': '패션 SNS 게시물·댓글·좋아요 API. AI 분석 파이프라인은 cv_service(FastAPI)의 /docs를 참고.',  # 제목 아래에 표시될 설명
+    'VERSION': '1.0.0',                                      # API 버전 표시
+    'SERVE_INCLUDE_SCHEMA': False,     # 명세 데이터 주소(/api/schema/) 자체는 Swagger 목록에 나타나지 않게 함
+    'COMPONENT_SPLIT_REQUEST': True,   # 요청용/응답용 명세를 따로 만듦 → 이미지 칸이 "주소 문자열"이 아니라 "파일 선택 버튼"으로 나옴
 }
