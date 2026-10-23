@@ -89,6 +89,15 @@ media/          # 업로드된 게시물 이미지
   - `/analysis/api/<analysis_id>/callback/` — Celery task → Django 콜백 (토큰 검증)
   - `/analysis/api/<analysis_id>/status/` — 결과 페이지 폴링용 상태 조회 API (오래된 미완료 분석의 실패 전환도 여기서 처리)
 
+### 관리자 페이지 (Django Admin, `/admin/`)
+- **게시물 중심 화면**: 게시물 하나를 열면 사진, AI 분석 결과(해석·스타일 비율 표·탐지 아이템 표), 댓글, 좋아요가 한 화면에 모임. 탐지 아이템·스타일 비율·댓글·좋아요는 별도 메뉴 없이 게시물(또는 분석) 안에서 확인
+  - 게시물 목록: 썸네일, 분석 수·좋아요 수·댓글 수(클릭 정렬), 검색(캡션·작성자·댓글 내용)
+  - 댓글 삭제 가능(내용 수정은 불가), 좋아요는 보기 전용
+- **분석 화면** (`Analysis`): 게시물 없이 올린 독립 업로드 분석의 보관 장소. 분석한 사진 미리보기, 상태 필터(대기중/분석중/완료/실패), 탐지 아이템 수·실패 사유 표시
+- 표시 이름 통일: `게시물 #1 (캡션) · 분석 #2`, `독립 업로드 · 분석 #3`처럼 어느 게시물의 데이터인지 항상 보임
+- AI 결과·콜백 토큰은 읽기 전용, 분석·아이템·좋아요 직접 추가 불가 (분석 상태만 수정 가능)
+- 알려진 아쉬운 점: 사이드바에 `Analysiss`로 표시됨(자동 복수형), 인라인 줄 제목이 한 번 더 나옴
+
 ### cv_service (FastAPI)
 - Django와 완전히 분리된 독립 프로젝트 (`cv_service/pyproject.toml`, 자체 가상환경, 포트 8001)
 - `POST /analyze` — 이미지 + `callback_url` + `callback_token`을 받아 분석을 수행하고, 결과를 `callback_url`로 POST
@@ -102,6 +111,90 @@ media/          # 업로드된 게시물 이미지
 - 로그: `app/main.py`의 `logging.basicConfig`로 `시각 단계 파일이름: 내용` 형식을 설정하고, Gemini 호출 실패는 `logger.warning`으로 기록
 - API 키는 `cv_service/.env`의 `GEMINI_API_KEY`로 관리 (깃 추적 제외)
 
+
+## API 문서·관리자 화면
+
+### Swagger (`/api/docs/`)
+
+게시물·댓글·좋아요 API를 그룹별로 보여 주고, 화면에서 바로 요청을 보낼 수 있습니다.
+
+<img src="docs/images/swagger/01-overview.jpg" width="760">
+
+**게시물 작성** — 파일 선택 버튼으로 이미지를 올리면 `201`이 반환됩니다.
+
+<img src="docs/images/swagger/02-post-create-form.jpg" width="760">
+<img src="docs/images/swagger/02-post-create-response.jpg" width="760">
+
+**댓글 단건 조회 404** — Swagger로 테스트하다가 URL의 게시물 번호를 무시하던 버그를 찾아 고쳤습니다. 다른 게시물의 댓글 번호를 넣으면 404가 반환됩니다 (재발 방지 테스트 포함).
+
+<img src="docs/images/swagger/06-comment-404.jpg" width="760">
+
+**남의 댓글 삭제 403** — 작성자만 삭제할 수 있습니다.
+
+<img src="docs/images/swagger/07-comment-delete-403-response.jpg" width="760">
+
+<details>
+<summary>Swagger 화면 더 보기 (좋아요 토글, 수정 권한, 입력 화면)</summary>
+
+**게시물 작성 결과 (피드에 반영)**
+
+<img src="docs/images/swagger/03-post-create-feed.jpg" width="320">
+
+**좋아요 추가 (201, `liked: true`) → 피드 ♥1**
+
+<img src="docs/images/swagger/04-like-created-form.jpg" width="760">
+<img src="docs/images/swagger/04-like-created-response.jpg" width="760">
+<img src="docs/images/swagger/04-like-created-feed.jpg" width="320">
+
+**좋아요 취소 (200, `liked: false`) → 피드 ♡0**
+
+<img src="docs/images/swagger/05-like-canceled-response.jpg" width="760">
+<img src="docs/images/swagger/05-like-canceled-feed.jpg" width="320">
+
+**남의 댓글 삭제 시도 (입력 화면)**
+
+<img src="docs/images/swagger/07-comment-delete-403-form.jpg" width="760">
+
+**남의 댓글 수정 시도 403**
+
+<img src="docs/images/swagger/more-comment-update-403-form.jpg" width="760">
+<img src="docs/images/swagger/more-comment-update-403-response.jpg" width="760">
+
+</details>
+
+### 관리자 페이지 (`/admin/`)
+
+**게시물 목록** — 썸네일과 분석·좋아요·댓글 수가 한눈에 보입니다.
+
+<img src="docs/images/admin/01-post-list.jpg" width="900">
+
+**게시물 상세** — AI 분석 결과(해석, 스타일 비율, 탐지 아이템)와 댓글·좋아요가 게시물 안에 모여 있습니다.
+
+<img src="docs/images/admin/02-post-detail-analysis.jpg" width="900">
+<img src="docs/images/admin/03-post-detail-comments-likes.jpg" width="900">
+
+**분석 목록** — 상태 필터, 탐지 아이템 수, 실패 사유. 게시물 없이 올린 분석은 `독립 업로드`로 표시됩니다.
+
+<img src="docs/images/admin/04-analysis-list.jpg" width="900">
+
+<details>
+<summary>관리자 화면 더 보기 (게시물 상세 위쪽, 분석 상세)</summary>
+
+**게시물 상세 (위쪽)**
+
+<img src="docs/images/admin/more-post-detail-top.jpg" width="900">
+
+**분석 상세 (게시물 기반)** — 사진, 해석, 탐지 아이템, 스타일 비율
+
+<img src="docs/images/admin/more-analysis-detail.jpg" width="900">
+<img src="docs/images/admin/more-analysis-detail-items.jpg" width="900">
+
+**분석 상세 (독립 업로드)**
+
+<img src="docs/images/admin/more-analysis-standalone.jpg" width="900">
+<img src="docs/images/admin/more-analysis-standalone-items.jpg" width="900">
+
+</details>
 
 ## 디자인 시스템
 

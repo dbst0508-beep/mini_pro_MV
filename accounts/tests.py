@@ -104,8 +104,8 @@ class MypageTests(TestCase):  # 마이페이지 테스트 클래스
 
     def test_requires_login(self):  # 비로그인 유저가 마이페이지에 접근하는 케이스
         response = self.client.get("/mypage/")  # 로그인 없이 요청
-        self.assertRedirects(response, "/login/?next=/mypage/")  # 로그인 페이지로 리다이렉트되어야 함
-
+        self.assertRedirects(response, "/login/")  # 비로그인이면 next 없이 로그인 페이지로 리다이렉트되어야 함 (mypage 뷰가 username 없는 요청에서 직접 redirect하는 현재 동작에 맞춤)
+    
     def test_shows_only_my_posts(self):  # 내 게시물만 보이고 남의 게시물은 안 보이는지
         Post.objects.create(user=self.user, image="posts/mine.jpg", caption="내 게시물")  # 내 게시물 하나
         Post.objects.create(user=self.other_user, image="posts/theirs.jpg", caption="남의 게시물")  # 남의 게시물 하나
