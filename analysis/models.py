@@ -43,8 +43,9 @@ class Analysis(models.Model):
         """분석 대상 사진: 독립 업로드면 image, 게시물 기반이면 post.image"""
         return self.image if self.image else self.post.image
     
-    def __str__(self):
-        return f"Analysis #{self.pk} ({self.status})"
+    def __str__(self):                                        # 분석 기록을 문자열로 보여줄 때 쓰는 이름
+        target = str(self.post) if self.post_id else "독립 업로드"  # 게시물 기반이면 게시물 이름(위 Post.__str__), 아니면 "독립 업로드"
+        return f"{target} · 분석 #{self.pk}"                    # "게시물 #1 (캡션) · 분석 #3"처럼 대상 + 분석 번호 (재분석하면 번호가 달라서 구분됨)
 
 class DetectedItem(models.Model):
     # 어느 분석 결과에 속한 아이템인지 연결
@@ -65,8 +66,9 @@ class DetectedItem(models.Model):
     search_url = models.URLField(blank=True)  # 조립된 쇼핑 검색 링크
 
 
-    def __str__(self):
-        return f"{self.category} (analysis #{self.analysis_id})"
+    def __str__(self):                                        # 탐지된 아이템을 문자열로 보여줄 때 쓰는 이름
+        name = f"{self.category} ({self.label})" if self.label else self.category  # 세부 라벨이 있으면 "상의 (니트)", 없으면 "상의"
+        return f"{self.analysis} · {name}"                     # "게시물 #1 (캡션) · 분석 #3 · 상의 (니트)"처럼 어느 분석의 아이템인지까지 표시
 
 
 class StyleScore(models.Model):
@@ -83,6 +85,5 @@ class StyleScore(models.Model):
         # 같은 analysis 안에 같은 style_name이 중복으로 들어가는 것 방지
         unique_together = ("analysis", "style_name")
 
-    def __str__(self):
-        return f"{self.style_name} {self.ratio}% (analysis #{self.analysis_id})"
-
+    def __str__(self):                                        # 스타일 비율을 문자열로 보여줄 때 쓰는 이름
+        return f"{self.analysis} · {self.style_name} {self.ratio}%"  # "게시물 #1 (캡션) · 분석 #3 · 캐주얼 60.0%"처럼 어느 분석의 점수인지까지 표시
