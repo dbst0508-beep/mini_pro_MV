@@ -112,6 +112,70 @@ media/          # 업로드된 게시물 이미지
 - API 키는 `cv_service/.env`의 `GEMINI_API_KEY`로 관리 (깃 추적 제외)
 
 
+## 웹 화면
+
+### 회원가입
+
+비밀번호 규칙 안내가 항상 보이고, 규칙을 어기면 빨간 문구로 이유를 알려 줍니다.
+
+<img src="docs/images/web/signup-form.jpg" width="320">
+<img src="docs/images/web/signup-password-invalid.jpg" width="320">
+<img src="docs/images/web/signup-password-mismatch.jpg" width="320">
+<img src="docs/images/web/signup-password-confirm-required.jpg" width="320">
+
+가입이 끝나면 바로 로그인된 상태로 피드로 이동합니다.
+
+<img src="docs/images/web/signup-complete.jpg" width="320">
+
+### 피드·게시물
+
+**피드** — 사진과 캡션을 올리고, 좋아요,댓글을 남깁니다.
+
+<img src="docs/images/web/feed-default.jpg" width="320">
+<img src="docs/images/web/post-created.jpg" width="320">
+
+**게시물 상세** — 여기서 "AI 분석 요청" 버튼으로 분석을 시작합니다.
+
+<img src="docs/images/web/post-detail.jpg" width="320">
+
+### AI 분석 (게시물 기반)
+
+**분석 중** — 3초마다 상태를 확인하다가 완료되면 자동으로 새로고침됩니다.
+
+<img src="docs/images/web/post-analysis-loading.jpg" width="320">
+
+**분석 완료** — 박스 번호와 아이템 카드 번호가 대응됩니다.
+
+<img src="docs/images/web/post-analysis-done-1.jpg" width="320">
+<img src="docs/images/web/post-analysis-done-2.jpg" width="320">
+
+**LLM 호출 실패** — 탐지 결과는 그대로 보여 주고, 해석 자리에 안내 문구를 표시합니다.
+
+<img src="docs/images/web/post-analysis-llm-fail.jpg" width="320">
+
+### AI 분석 (독립 업로드)
+
+게시물 없이 사진 한 장만 올려 분석합니다.
+
+<img src="docs/images/web/analyze-upload.jpg" width="320">
+<img src="docs/images/web/analyze-loading.jpg" width="320">
+
+**분석 완료**
+
+<img src="docs/images/web/analyze-done-1.jpg" width="320">
+<img src="docs/images/web/analyze-done-2.jpg" width="320">
+
+**LLM 호출 실패**
+
+<img src="docs/images/web/analyze-llm-fail.jpg" width="320">
+
+### 마이페이지
+
+프로필 사진을 바꾸면 기본 아이콘이 새 사진으로 바뀝니다.
+
+<img src="docs/images/web/mypage-default.jpg" width="320">
+<img src="docs/images/web/mypage-profile-changed.jpg" width="320">
+
 ## API 문서·관리자 화면
 
 ### Swagger (`/api/docs/`)
