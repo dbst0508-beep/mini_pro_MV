@@ -15,3 +15,6 @@ media
 # 문서와 별도 서비스(cv_service는 자체 Dockerfile이 있음)
 docs
 cv_service
+
+# 비밀값 파일: 이미지에 굽지 않고 실행할 때 env_file로만 주입
+.env

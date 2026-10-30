@@ -21,10 +21,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-j&kpfpkj!6cpw+zx)77m)3)j-&k2wq%cg!@^^ln9pak!lr%x=&'
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"] #env에서 읽어옴, 없을 시 KeyError
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG =  os.environ.get("DJANGO_DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "web"]        # 접속을 허용할 주소 목록. "web"은 cv_service가 콜백할 때 쓰는 compose 서비스 이름이라 꼭 필요함
 

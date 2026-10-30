@@ -6,9 +6,9 @@ services:                                   # 띄울 컨테이너(서비스)들�
   db:                                       # PostgreSQL 서버 컨테이너. 이름이 "db"라 다른 컨테이너가 "db"로 이 DB를 찾음
     image: postgres:17                      # 공식 PostgreSQL 이미지를 그대로 사용
     environment:                            # 이 컨테이너가 처음 켜질 때 DB를 만드는 데 쓰는 값
-      POSTGRES_DB: mom_vision               # 만들어 둘 DB 이름 (settings.py의 NAME과 같아야 함)
-      POSTGRES_USER: postgres               # DB 관리자 사용자 이름
-      POSTGRES_PASSWORD: postgres           # 그 사용자의 비밀번호 (개발용 값. 배포 때는 반드시 바꿀 것)
+      POSTGRES_DB: ${POSTGRES_DB}           # ${...}: compose가 같은 폴더의 .env에서 값을 찾아 채워 넣음
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data   # DB 파일이 저장되는 폴더를 이름 있는 볼륨에 연결해 컨테이너를 지워도 데이터가 남게 함
     healthcheck:                            # "DB가 접속 받을 준비가 됐는지"를 주기적으로 검사하는 설정
@@ -22,14 +22,13 @@ services:                                   # 띄울 컨테이너(서비스)들�
     build: .                                # 현재 폴더(루트)의 Dockerfile로 이미지를 만듦
     ports:
       - "8000:8000"                         # 내 컴퓨터 8000번 포트 → 컨테이너 8000번 포트 (브라우저에서 접속하기 위함)
+    env_file:                               # .env의 모든 줄을 컨테이너 환경변수로 넣음 (SECRET_KEY, DEBUG, DB 접속 정보)
+      - .env
     environment:                            # 컨테이너 안에 환경변수를 넣음 (settings.py의 os.environ.get이 읽는 값)
       REDIS_URL: redis://redis:6379/0       # localhost 대신 redis 서비스 이름으로 접속
       INTERNAL_BASE_URL: http://web:8000    # 콜백 주소의 기준을 web 서비스로 지정
       CV_SERVICE_BASE_URL: http://cv_service:8001  # cv_service 서비스 이름으로 접속
       POSTGRES_HOST: db                     # DB 서버 주소 = db 서비스 이름 (이 값이 있으면 settings.py가 PostgreSQL을 사용)
-      POSTGRES_DB: mom_vision               # 접속할 DB 이름
-      POSTGRES_USER: postgres               # 접속할 사용자
-      POSTGRES_PASSWORD: postgres           # 비밀번호 (db 서비스의 값과 같아야 함)
 
     volumes:
       - ./media:/app/media                  # 업로드된 이미지도 같은 방식으로 연결
@@ -42,11 +41,10 @@ services:                                   # 띄울 컨테이너(서비스)들�
   celery:                                   # Celery 워커. web과 같은 코드를 쓰고 실행 명령만 다름
     build: .                                # web과 같은 Dockerfile로 이미지를 만듦
     command: celery -A config worker -l info   # CMD를 덮어써서 Django 서버 대신 Celery 워커를 실행
+    env_file:                               # web과 같은 .env를 사용
+      - .env
     environment:                            # web과 같은 환경변수 (워커도 Redis와 서비스 주소를 알아야 함)
       POSTGRES_HOST: db                     # DB 서버 주소 = db 서비스 이름 (이 값이 있으면 settings.py가 PostgreSQL을 사용)
-      POSTGRES_DB: mom_vision               # 접속할 DB 이름
-      POSTGRES_USER: postgres               # 접속할 사용자
-      POSTGRES_PASSWORD: postgres           # 비밀번호 (db 서비스의 값과 같아야 함)   
       REDIS_URL: redis://redis:6379/0
       INTERNAL_BASE_URL: http://web:8000
       CV_SERVICE_BASE_URL: http://cv_service:8001
