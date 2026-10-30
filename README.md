@@ -109,7 +109,7 @@ media/          # 업로드된 게시물 이미지
 - Gemini 호출이 성공하면 세부 라벨을 Gemini 결과로 덮어쓰고, 실패하면 FashionCLIP 라벨과 안내 문구로 대체해 탐지 결과는 그대로 저장
 - Gemini 응답 지연 대비: 요청 한 번당 30초 제한(`LLM_TIMEOUT`), 서버 혼잡(503) 시 재시도 1회(`LLM_RETRY_ATTEMPTS`)로 제한 → Gemini가 응답하지 않아도 약 1분 안에 탐지 결과만으로 분석이 완료됨 (제한이 없을 때는 Celery의 300초 제한에 걸려 분석 전체가 실패했음)
 - 로그: `app/main.py`의 `logging.basicConfig`로 `시각 단계 파일이름: 내용` 형식을 설정하고, Gemini 호출 실패는 `logger.warning`으로 기록
-- API 키는 `cv_service/.env`의 `GEMINI_API_KEY`로 관리 (깃 추적 제외)
+- API 키는 `cv_service/.env`의 `GEMINI_API_KEY`로 관리 (깃 추적 제외, 견본은 `cv_service/.env.example`)
 
 
 ## 웹 화면
@@ -272,9 +272,28 @@ media/          # 업로드된 게시물 이미지
 
 AI 분석 기능은 Redis + Celery worker + cv_service(FastAPI)가 같이 떠 있어야 동작합니다.
 
+### 사전 준비 — `.env` 파일 2개
+
+비밀값은 코드에 적지 않고 `.env` 파일에서 읽습니다 (`.env`는 깃 추적과 Docker 이미지에서 제외). 견본 파일을 복사한 뒤 값을 채우세요.
+
+```bash
+cp .env.example .env                        # Django용: SECRET_KEY, DEBUG, DB 접속 정보
+cp cv_service/.env.example cv_service/.env  # cv_service용: GEMINI_API_KEY
+
+# .env의 DJANGO_SECRET_KEY에 넣을 새 키 만들기 ($, # 같은 문자가 섞일 수 있으니 작은따옴표로 감싸서 넣기)
+uv run python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+| 변수 | 파일 | 설명 |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | `.env` | 필수. 없으면 서버가 `KeyError`로 시작되지 않음 |
+| `DJANGO_DEBUG` | `.env` | 정확히 `True`일 때만 켜짐. 값이 없으면 꺼짐 (개발 중에는 `True`) |
+| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `.env` | Docker의 PostgreSQL 접속 정보 (개발용 값) |
+| `GEMINI_API_KEY` | `cv_service/.env` | Gemini API 키 (발급: Google AI Studio) |
+
 ### 방법 1 — Docker Compose (권장)
 
-한 번에 5개(web, celery, cv_service, redis, db)가 같이 뜹니다. `cv_service/.env`에 `GEMINI_API_KEY`가 있어야 합니다.
+한 번에 5개(web, celery, cv_service, redis, db)가 같이 뜹니다. 위의 `.env` 파일 2개가 있어야 합니다.
 
 ```bash
 docker compose build   # 이미지 만들기 (처음 한 번, 의존성이 바뀌면 다시)
@@ -290,7 +309,8 @@ docker compose exec web python manage.py createsuperuser
 - DB는 PostgreSQL 컨테이너(`db`)를 사용하고, 데이터는 Docker 볼륨(`postgres_data`)에 저장되어 컨테이너를 지워도 남습니다. `docker compose down -v`는 볼륨까지 지우므로 DB 데이터가 사라집니다. `db`의 포트는 컴퓨터 밖으로 열지 않았으며, 직접 확인하려면 `docker compose exec db psql -U postgres -d mom_vision`을 사용합니다.
 - `config/settings.py`는 환경변수 `POSTGRES_HOST`가 있을 때만 PostgreSQL(`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`)을 사용하고, 없으면 기존 SQLite(`db.sqlite3`)를 사용합니다. 아래 방법 2는 그대로 SQLite로 동작합니다.
 - 업로드 이미지(`media/`)는 내 컴퓨터의 폴더를 컨테이너에 연결해서 사용합니다.
-- DB 비밀번호(`postgres`)는 개발용 값입니다. 배포 전에 반드시 교체해야 합니다.
+- `web`, `celery`는 `env_file`로 `.env` 전체를 받고, `db`는 `${POSTGRES_PASSWORD}`처럼 필요한 값 3개만 골라 받습니다 (DB 컨테이너에는 Django `SECRET_KEY`가 필요 없음).
+- DB 비밀번호(`postgres`)는 개발용 값입니다. PostgreSQL은 볼륨이 처음 만들어질 때만 이 값을 읽으므로, 기존 볼륨이 있는 상태에서 `.env`의 값만 바꾸면 접속에 실패합니다. 배포 때는 새 볼륨에 강한 비밀번호를 넣어야 합니다.
 
 ### 방법 2 — 터미널 4개로 직접 실행
 
@@ -308,11 +328,12 @@ uv run --env-file .env uvicorn app.main:app --reload --port 8001
 
 # 터미널 3 — Celery worker
 uv sync
-uv run celery -A config worker -l info
+uv run --env-file .env celery -A config worker -l info
 
 # 터미널 4 — Django 서버
-uv run python manage.py migrate
-uv run python manage.py runserver
+uv run --env-file .env python manage.py migrate
+uv run --env-file .env python manage.py runserver
+# 루트 .env에 DJANGO_SECRET_KEY가 있어야 합니다. (POSTGRES_HOST는 넣지 않으므로 SQLite로 동작)
 
 ```
 
@@ -323,10 +344,12 @@ uv run python manage.py runserver
 ## 테스트 실행
 
 ```bash
-uv run python manage.py test posts
-uv run python manage.py test accounts
-uv run python manage.py test analysis
+uv run --env-file .env python manage.py test posts
+uv run --env-file .env python manage.py test accounts
+uv run --env-file .env python manage.py test analysis
 ```
+
+- settings.py가 `.env`에서 `DJANGO_SECRET_KEY`를 읽으므로 `--env-file .env`가 필요합니다.
 
 - posts: 좋아요/댓글 생성·조회·수정·삭제, 다른 게시물의 댓글 접근 차단, 게시물 등록 API 테스트 (17개)
 - accounts: 회원가입/로그인/로그아웃/마이페이지 테스트 (13개)
@@ -348,9 +371,9 @@ uv run --env-file .env python -m unittest -v
 
 - 모델 설계(ERD)는 [`docs/erd.md`](docs/erd.md)에 있습니다.
 - `LANGUAGE_CODE`, `TIME_ZONE`은 한국(`ko-kr`, `Asia/Seoul`) 기준으로 설정되어 있습니다.
-- `SECRET_KEY`는 개발용 기본값이며, 배포 전 환경 변수 등으로 교체가 필요합니다.
+- `SECRET_KEY`는 `.env`에서 읽습니다. 예전에 코드에 적혀 있던 키는 git 기록에 남아 있어 폐기했고, 새로 만든 키로 교체했습니다.
 - 이미지 분석을 담당할 `cv_service`(FastAPI)는 이 저장소에 포함되어 있으며, 실제 객체 탐지 + 세부 라벨링 모델이 동작합니다. 스타일 비율/해석 텍스트/세부 라벨은 Gemini API로 생성하며, Django ↔ FastAPI 간 비동기 요청→콜백→상태 전환 전체 흐름은 검증된 상태입니다.
 - `cv_service`를 처음 실행하면 허깅페이스에서 모델 가중치를 다운로드하므로 기동에 시간이 걸릴 수 있습니다 (직접 실행 시 이후엔 로컬 캐시 사용). Docker로 실행하면 컨테이너를 새로 만들 때마다 다시 내려받습니다 (모델 캐시 볼륨 연결은 추후 과제).
-- Docker 구성 관련 한계: `redis`는 `depends_on`이 시작 순서만 보장합니다(`db`는 `healthcheck`로 준비 완료까지 대기). DB 비밀번호가 `docker-compose.yml`의 3곳에 적혀 있고, 서버는 개발용 `runserver`입니다. 자동 테스트(`manage.py test`)는 Docker 없이 SQLite로 실행하는 것을 기준으로 합니다.
+- Docker 구성 관련 한계: `redis`는 `depends_on`이 시작 순서만 보장합니다(`db`는 `healthcheck`로 준비 완료까지 대기). 서버는 개발용 `runserver`입니다 (`DEBUG=False`로 바꾸면 CSS·이미지가 나오지 않으므로, 배포 단계에서 whitenoise/nginx와 함께 전환 예정). 자동 테스트(`manage.py test`)는 Docker 없이 SQLite로 실행하는 것을 기준으로 합니다.
 - 알려진 한계: 작은 신발/부츠는 탐지되지 않을 수 있습니다 (탐지 모델이 해당 박스를 낮은 점수로만 인식하며, 기준값 조정으로는 해결되지 않음). Gemini 해석 글에는 언급되지만 박스는 표시되지 않습니다. 근본 해결은 고도화 단계에서 다룹니다.
 - 서버를 켠 직후의 첫 분석은 모델 준비 시간 때문에 1분 이상 걸릴 수 있고, 이후 분석은 수 초 내에 끝납니다.
