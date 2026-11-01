@@ -60,7 +60,7 @@ media/          # 업로드된 게시물 이미지
 - API 문서(Swagger): `http://localhost:8000/api/docs/` — 게시물·댓글·좋아요 API를 "게시물/댓글/좋아요" 그룹으로 보여 주고 화면에서 바로 요청을 보낼 수 있음 (명세 원본 데이터는 `/api/schema/`)
   - 세션 로그인 방식이라 같은 브라우저에서 `/login/`으로 먼저 로그인한 뒤 열면 로그인 상태로 요청됨
   - 게시물 작성은 파일 선택 버튼으로 이미지 업로드 가능
-  - AI 분석 주소(`/analysis/...`)는 DRF가 아닌 일반 Django 뷰라 이 문서에서 제외. 분석 서버의 API는 `cv_service`의 `http://localhost:8001/docs`에서 확인 (`/analyze`는 실제 분석을 실행하므로 화면에서 Execute는 비권장)
+  - AI 분석 주소(`/analysis/...`)는 DRF가 아닌 일반 Django 뷰라 이 문서에서 제외.  분석 서버의 API는 터미널로 cv_service를 실행했을 때 `http://localhost:8001/docs`에서 확인 (compose 실행 시에는 보안상 cv_service 포트를 외부에 열지 않음) (`/analyze`는 실제 분석을 실행하므로 화면에서 Execute는 비권장)
 
 ### analysis
 - `Analysis`: 스타일 분석 요청/상태(`대기중`/`분석중`/`완료`/`실패`) 관리. `post` 또는 `image` 둘 중 하나로 "무엇을 분석하는지" 연결(둘 다 nullable), 콜백 검증용 토큰 보유
@@ -304,7 +304,7 @@ docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
 ```
 
-- 접속: Django `http://localhost:8000` (API 문서 `/api/docs/`), cv_service `http://localhost:8001` (API 문서 `/docs`)
+- 접속: Django `http://localhost:8000` (API 문서 `/api/docs/`). cv_service는 내부 네트워크에서만 접근 가능 (외부 포트 없음)
 - 컨테이너끼리는 서비스 이름(`redis`, `web`, `cv_service`)으로 서로를 부르며, `config/settings.py`가 환경변수(`REDIS_URL`, `INTERNAL_BASE_URL`, `CV_SERVICE_BASE_URL`)로 주소를 읽습니다. 환경변수가 없으면 기존 `localhost` 값을 쓰므로 아래 방법 2도 그대로 동작합니다.
 - DB는 PostgreSQL 컨테이너(`db`)를 사용하고, 데이터는 Docker 볼륨(`postgres_data`)에 저장되어 컨테이너를 지워도 남습니다. `docker compose down -v`는 볼륨까지 지우므로 DB 데이터가 사라집니다. `db`의 포트는 컴퓨터 밖으로 열지 않았으며, 직접 확인하려면 `docker compose exec db psql -U postgres -d mom_vision`을 사용합니다.
 - `config/settings.py`는 환경변수 `POSTGRES_HOST`가 있을 때만 PostgreSQL(`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`)을 사용하고, 없으면 기존 SQLite(`db.sqlite3`)를 사용합니다. 아래 방법 2는 그대로 SQLite로 동작합니다.
