@@ -44,6 +44,7 @@ def run_analysis(analysis_id):
                     "callback_token": analysis.callback_token,
                 },
                 files={"image": image_file},                                  # 실제 이미지 파일
+                headers={"X-Internal-Token": settings.INTERNAL_API_TOKEN},    # cv_service가 확인할 내부 출입증                
                 timeout=ANALYZE_TIMEOUT,                                       # 이 시간 넘게 답이 없으면 포기
             )
         response.raise_for_status()                                         # 응답이 에러(4xx/5xx)면 예외를 일으킴

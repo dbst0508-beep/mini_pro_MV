@@ -12,7 +12,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile  # "업로드된 �
 from django.test import TestCase, override_settings  # Django 기본 테스트 도구 + 설정을 잠깐 바꾸는 도구
 from django.urls import reverse  # URL 이름("analysis:callback")으로 실제 주소를 만들어주는 함수
 from django.utils import timezone  # 현재 시각을 가져올 때 씀
-
+from django.conf import settings
 from posts.models import Post  # 분석 대상이 될 게시물
 from .models import Analysis  # 테스트할 분석 모델
 from .tasks import mark_failed, run_analysis  # 테스트할 실패 기록 함수와 분석 task
@@ -209,7 +209,7 @@ class RunAnalysisTests(AnalysisTestCase):
         self.assertEqual(sent["data"]["callback_token"], "test-token")  # 이 분석의 토큰을 보냈어야 함
         self.assertIn(f"/analysis/api/{self.analysis.id}/callback/", sent["data"]["callback_url"])  # 이 분석의 콜백 주소를 보냈어야 함
         self.assertIn("timeout", sent)  # 제한 시간을 걸었어야 함
-
+        self.assertEqual(sent["headers"]["X-Internal-Token"], settings.INTERNAL_API_TOKEN)  # 내부 출입증을 실어 보냈어야 함
         self.analysis.refresh_from_db()
         self.assertEqual(self.analysis.status, Analysis.STATUS_PROCESSING)  # 콜백이 오기 전이니 "분석중"이어야 함
 

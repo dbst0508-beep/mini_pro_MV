@@ -153,7 +153,7 @@ CELERY_RESULT_SERIALIZER = "json"                           # 결과 직렬화 �
 INTERNAL_BASE_URL = os.environ.get("INTERNAL_BASE_URL", "http://localhost:8000")  # 콜백 주소의 기준. compose에서는 http://web:8000으로 덮어씀
  # CV 분석을 맡은 FastAPI 서버 주소 (cv_service/, 8001번 포트)
 CV_SERVICE_BASE_URL = os.environ.get("CV_SERVICE_BASE_URL", "http://localhost:8001")  # cv_service 주소. compose에서는 http://cv_service:8001로 덮어씀
-
+INTERNAL_API_TOKEN = os.environ["INTERNAL_API_TOKEN"]  # cv_service에 요청할 때 보내는 내부 출입증. 없으면 서버가 아예 안 켜짐(KeyError)
 # 로그 설정: analysis 앱의 로그(logger.error 등)를 "시각 단계 파일이름: 내용" 모양으로 터미널에 출력
 LOGGING = {
     "version": 1,                                         # 설정 형식의 버전 (지금은 항상 1로 적는 것이 약속)
