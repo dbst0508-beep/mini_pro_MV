@@ -48,7 +48,7 @@ class AnalyzeEndpointTests(unittest.TestCase):  # /analyze 전체 흐름 테스�
         return self.client.post(
             "/analyze",
             files={"image": ("look.png", make_image_file(), "image/png")},
-            data={"callback_url": "http://django/callback/", "callback_token": "secret-token"},
+            data={"callback_url": "http://web:8000/callback/", "callback_token": "secret-token"},
             headers=headers,
         )
 
@@ -61,7 +61,7 @@ class AnalyzeEndpointTests(unittest.TestCase):  # /analyze 전체 흐름 테스�
 
         self.mock_send_callback.assert_called_once()  # 콜백 전송 함수가 딱 한 번 불렸는지
         callback_url, payload = self.mock_send_callback.call_args.args  # 불릴 때 넘겨받은 값 2개를 꺼냄
-        self.assertEqual(callback_url, "http://django/callback/")  # 받은 주소로 보냈는지
+        self.assertEqual(callback_url,  "http://web:8000/callback/")  # 받은 주소로 보냈는지
         self.assertEqual(payload.callback_token, "secret-token")  # 받은 토큰 그대로 실었는지
         self.assertEqual(payload.detected_items[0].label, "흰색 티셔츠")  # 라벨링 결과가 담겼는지
         self.assertEqual(payload.detected_items[0].bbox_x, 0.1)  # 박스 좌표도 그대로인지
@@ -119,3 +119,14 @@ class AnalyzeEndpointTests(unittest.TestCase):  # /analyze 전체 흐름 테스�
         with patch.dict("os.environ", {"INTERNAL_API_TOKEN": ""}):
             response = self.post_analyze(headers={"X-Internal-Token": ""})
         self.assertEqual(response.status_code, 401)
+
+    def test_disallowed_callback_url_is_rejected(self):
+        """허용 목록 밖의 콜백 주소면 400, 분석은 시작도 안 한다"""
+        response = self.client.post(
+            "/analyze",
+            files={"image": ("look.png", make_image_file(), "image/png")},
+            data={"callback_url": "http://evil.com/steal/", "callback_token": "secret-token"},
+            headers={"X-Internal-Token": "test-internal-token"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.mock_detect_items.assert_not_called()
