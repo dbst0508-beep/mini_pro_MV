@@ -150,6 +150,7 @@ class RequestAnalysisTests(AnalysisTestCase):
 
         new_analysis = Analysis.objects.exclude(pk=self.analysis.pk).get()  # setUp에서 만든 것 말고 새로 생긴 분석 1건
         self.assertEqual(new_analysis.post, self.post)  # 그 게시물에 연결돼 있어야 함
+        self.assertEqual(new_analysis.user, self.other_user)  # 게시물 주인이 아니라 "요청한 사람"이 분석의 주인이어야 함        
         self.assertTrue(new_analysis.callback_token)  # 콜백 토큰이 채워져 있어야 함
         mock_task.delay.assert_called_once_with(new_analysis.id)  # Celery에 이 분석의 id로 딱 한 번 일을 넘겼어야 함
         self.assertRedirects(
@@ -171,6 +172,7 @@ class RequestAnalysisTests(AnalysisTestCase):
 
         new_analysis = Analysis.objects.exclude(pk=self.analysis.pk).get()
         self.assertIsNone(new_analysis.post)  # 게시물 없이 만들어져야 함
+        self.assertEqual(new_analysis.user, self.user)  # 업로드한 사람이 분석의 주인이어야 함        
         self.assertTrue(new_analysis.image)  # 업로드한 사진이 저장돼 있어야 함
         mock_task.delay.assert_called_once_with(new_analysis.id)
         self.assertRedirects(

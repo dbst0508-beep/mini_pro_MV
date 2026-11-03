@@ -77,9 +77,11 @@ def request_analysis(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
 
     analysis = Analysis.objects.create(                            # 누구 게시물이든 상관없이 바로 생성
+        user=request.user,                                           # 요청한 사람을 주인으로 기록
         post=post,
         callback_token=secrets.token_hex(32),
     )
+
     run_analysis.delay(analysis.id)
 
     return redirect("analysis:result", post_id=post.id)               # 결과 페이지로 이동
@@ -115,6 +117,7 @@ def upload_and_analyze(request):
         messages.error(request, error.messages[0])                 # 실패 이유를 화면에 보여 주도록 남김
         return redirect("analysis:home")                           # 업로드 화면으로 돌려보냄 (분석은 만들지 않음)
     analysis = Analysis.objects.create(                          # post= 대신 image= 로 생성 (post는 비워둠)
+        user=request.user,                                         # 업로드한 사람을 주인으로 기록
         image=image,
         callback_token=secrets.token_hex(32),
     )

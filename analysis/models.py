@@ -1,5 +1,6 @@
 from django.db import models
-
+from django.conf import settings  # settings.AUTH_USER_MODEL(우리 User 모델 이름)을 쓰기 위해
+from django.db import models
 
 class Analysis(models.Model):
     # status 필드에서 쓸 수 있는 값들을 클래스 상수로 미리 정의
@@ -15,6 +16,15 @@ class Analysis(models.Model):
         (STATUS_COMPLETED, "완료"),
         (STATUS_FAILED, "실패"),
     ]
+
+    # 누가 요청한 분석인지 (독립 업로드 결과를 본인만 보게 하고, 요청 횟수를 셀 때 씀)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,  # accounts.User를 문자열로 참조 (posts/models.py와 같은 방식)
+        on_delete=models.CASCADE,  # 회원이 탈퇴하면 그 사람의 분석 기록도 같이 삭제
+        related_name="analyses",  # user.analyses.all()로 내 분석 목록 조회
+        null=True, blank=True,  # 이 필드를 만들기 전에 생긴 분석들은 주인을 알 수 없으므로 비워 둘 수 있게
+    )
+
 
     # 어느 게시물에 대한 분석인지 연결 (FK라서 한 Post에 여러 Analysis 가능 = 재분석 허용)
     post = models.ForeignKey(
