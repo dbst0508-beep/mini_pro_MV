@@ -4,7 +4,7 @@ import tempfile  # 임시 폴더를 만들 때 씀
 from datetime import timedelta  # "1초" 같은 시간 간격을 표현할 때 씀
 from io import BytesIO  # 파일을 디스크에 안 만들고 메모리 안에서 다루기 위함
 from unittest.mock import patch  # 테스트 동안만 특정 대상을 "가짜"로 바꿔치기하는 도구
-
+from django.contrib.messages import get_messages
 import requests  # 연결 실패/시간 초과 같은 진짜 예외 종류를 가져다 쓰기 위함
 from PIL import Image  # 진짜 이미지 데이터를 코드로 직접 만들기 위함
 from django.contrib.auth import get_user_model  # 커스텀 User 모델을 안전하게 가져오는 표준 방법
@@ -178,6 +178,34 @@ class RequestAnalysisTests(AnalysisTestCase):
             reverse("analysis:standalone_result", args=[new_analysis.id]),  # 단독 결과 페이지로 보내야 함
             fetch_redirect_response=False,
         )
+
+    def test_upload_without_file_is_rejected(self, mock_task):
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("analysis:upload"))  # 파일 없이 제출
+
+        self.assertRedirects(response, reverse("analysis:home"), fetch_redirect_response=False)  # 500이 아니라 업로드 화면으로
+        self.assertEqual(Analysis.objects.count(), 1)  # setUp의 1건 말고 새로 만들어지면 안 됨
+        mock_task.delay.assert_not_called()  # 분석 요청도 가면 안 됨
+
+    def test_upload_non_image_is_rejected(self, mock_task):
+        self.client.force_login(self.user)
+        fake = SimpleUploadedFile("photo.jpg", b"not an image", content_type="image/jpeg")  # 이름과 형식만 사진인 가짜 파일
+        response = self.client.post(reverse("analysis:upload"), {"image": fake})
+
+        self.assertRedirects(response, reverse("analysis:home"), fetch_redirect_response=False)
+        self.assertEqual(Analysis.objects.count(), 1)
+        mock_task.delay.assert_not_called()
+        self.assertTrue(list(get_messages(response.wsgi_request)))  # 실패 안내가 남아 있어야 함
+
+    @patch("config.validators.MAX_UPLOAD_SIZE", 10)  # 진짜 10MB 파일을 만들긴 무거우니, 테스트 동안만 한도를 10바이트로 낮춤
+    def test_upload_too_large_is_rejected(self, mock_task):
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("analysis:upload"), {"image": generate_test_image()})  # 진짜 이미지지만 10바이트보다 큼
+
+        self.assertEqual(Analysis.objects.count(), 1)
+        mock_task.delay.assert_not_called()
+        self.assertIn("10MB", str(list(get_messages(response.wsgi_request))[0]))  # 크기 안내 문구여야 함
+
 # 상태 조회 테스트 코드 (결과 페이지가 3초마다 부르는 주소)
 class AnalysisStatusTests(AnalysisTestCase):
     def setUp(self):
