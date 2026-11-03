@@ -110,6 +110,36 @@ class AnalysisCallbackTests(AnalysisTestCase):
         self.assertEqual(self.analysis.status, Analysis.STATUS_FAILED)  # 분석은 "실패"로 표시돼야 함
         self.assertIn("저장하지 못했습니다", self.analysis.error_message)  # 안내 문구가 저장돼야 함
 
+    def test_completed_analysis_rejects_duplicate_callback(self):
+        self.analysis.status = Analysis.STATUS_COMPLETED  # 이미 결과가 저장된 상태로 만듦
+        self.analysis.save()
+        self.payload["style_scores"] = []  # DB 중복 금지 규칙에 우연히 걸리지 않게 비움 → 우리 409 검사만으로 막히는지 확인
+
+        response = self.post_callback(self.payload)
+
+        self.assertEqual(response.status_code, 409)  # 충돌로 거절돼야 함
+        self.assertEqual(self.analysis.detected_items.count(), 0)  # 아이템이 추가로 저장되면 안 됨
+
+    def test_wrong_token_on_completed_gets_403_not_409(self):
+        self.analysis.status = Analysis.STATUS_COMPLETED
+        self.analysis.save()
+        self.payload["callback_token"] = "wrong-token"
+
+        response = self.post_callback(self.payload)
+
+        self.assertEqual(response.status_code, 403)  # 토큰 검사가 먼저: 토큰이 없는 사람에게 "완료됐는지"를 알려 주지 않음
+
+    def test_late_callback_on_failed_analysis_is_accepted(self):
+        mark_failed(self.analysis.id, "분석 시간이 초과되었습니다.")  # 6분이 지나 실패 처리된 상황
+
+        response = self.post_callback(self.payload)  # 그 뒤에 결과가 늦게 도착
+
+        self.assertEqual(response.status_code, 200)  # 받아들여야 함
+        self.analysis.refresh_from_db()
+        self.assertEqual(self.analysis.status, Analysis.STATUS_COMPLETED)  # 완료로 살아나야 함
+        self.assertEqual(self.analysis.error_message, "")  # 실패 문구는 지워져야 함
+        self.assertEqual(self.analysis.detected_items.count(), 1)  # 결과도 저장돼야 함
+
 
 # 분석 요청 테스트 코드 (게시물 기반 A 플로우 + 독립 업로드 B 플로우)
 @patch("analysis.views.run_analysis")  # 이 클래스의 테스트 동안 views.py의 run_analysis를 가짜로 바꿈 → 각 테스트가 mock_task로 받음
