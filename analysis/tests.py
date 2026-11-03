@@ -208,6 +208,43 @@ class RequestAnalysisTests(AnalysisTestCase):
         mock_task.delay.assert_not_called()
         self.assertIn("10MB", str(list(get_messages(response.wsgi_request))[0]))  # 크기 안내 문구여야 함
 
+# 독립 업로드 분석 접근 제한 테스트 코드 (결과 화면 + 상태 조회)
+class StandaloneAccessTests(AnalysisTestCase):
+    def setUp(self):
+        super().setUp()
+        self.standalone = Analysis.objects.create(  # user1이 게시물 없이 올린 분석
+            user=self.user, image=generate_test_image(), callback_token="standalone-token",
+        )
+        self.result_url = reverse("analysis:standalone_result", args=[self.standalone.id])
+        self.status_url = reverse("analysis:status", args=[self.standalone.id])
+
+    def test_owner_can_see_result_and_status(self):
+        self.client.force_login(self.user)  # 올린 본인으로 로그인
+
+        self.assertEqual(self.client.get(self.result_url).status_code, 200)  # 결과 화면이 보여야 함
+        self.assertEqual(self.client.get(self.status_url).status_code, 200)  # 상태 조회도 돼야 함
+
+    def test_other_user_gets_404(self):
+        self.client.force_login(self.other_user)  # 남으로 로그인
+
+        self.assertEqual(self.client.get(self.result_url).status_code, 404)  # "없는 것"처럼 보여야 함 (403 아님)
+        self.assertEqual(self.client.get(self.status_url).status_code, 404)
+
+    def test_anonymous_gets_404(self):
+        self.assertEqual(self.client.get(self.result_url).status_code, 404)  # 로그인 안 하면 볼 수 없음
+        self.assertEqual(self.client.get(self.status_url).status_code, 404)
+
+    def test_ownerless_old_upload_is_hidden_from_anonymous(self):
+        Analysis.objects.filter(pk=self.standalone.pk).update(user=None)  # user 칸을 만들기 전에 생긴 옛날 분석처럼 만듦
+
+        self.assertEqual(self.client.get(self.result_url).status_code, 404)  # None == None 함정에 빠지지 않아야 함
+
+    def test_post_based_status_is_still_public(self):
+        url = reverse("analysis:status", args=[self.analysis.id])  # setUp의 게시물 기반 분석
+
+        self.assertEqual(self.client.get(url).status_code, 200)  # 게시물 기반은 로그인 없이도 지금처럼 조회돼야 함
+
+
 # 상태 조회 테스트 코드 (결과 페이지가 3초마다 부르는 주소)
 class AnalysisStatusTests(AnalysisTestCase):
     def setUp(self):

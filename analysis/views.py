@@ -7,7 +7,7 @@ import secrets                                              # 랜덤한 콜백 �
 from datetime import timedelta                              # "6분" 같은 시간 간격을 표현할 때 씀
 from django.utils import timezone                            # 현재 시각을 가져올 때 씀
 from django.contrib.auth.decorators import login_required    # 로그인 안 했으면 로그인 페이지로 보내는 데코레이터
-from django.http import JsonResponse  # "권한 없음" 응답 (403)
+from django.http import JsonResponse,Http404  # JsonResponse: JSON 응답, Http404: "없음"(404) 응답을 내는 에러
 from posts.models import Post                                 # post_id로 게시물 찾을 때 씀
 from .tasks import run_analysis,mark_failed                          # 4단계에서 만든 그 task
 from django.shortcuts import render,redirect,get_object_or_404
@@ -125,13 +125,20 @@ def upload_and_analyze(request):
 
     return redirect("analysis:standalone_result", analysis_id=analysis.id)
 
+def get_visible_analysis(request, analysis_id):
+    """이 사람이 볼 수 있는 분석만 돌려줌. 독립 업로드는 요청한 본인만, 게시물 기반은 누구나"""
+    analysis = get_object_or_404(Analysis, pk=analysis_id)          # 없는 번호면 404
+    if analysis.post_id is None and analysis.user != request.user:   # 독립 업로드인데 요청한 사람이 아니면
+        raise Http404                                                # 남의 분석은 "없는 것"처럼 404
+    return analysis
+
 def standalone_result(request, analysis_id):                     # post_id가 아니라 analysis_id로 직접 조회
-    analysis = get_object_or_404(Analysis, pk=analysis_id)
+    analysis = get_visible_analysis(request, analysis_id)         # 본인 것(또는 공개된 게시물 분석)만, 아니면 404
     return render(request, "analysis/standalone_result.html", {"analysis": analysis})
 
 @require_GET                                                     # 상태 조회는 GET 요청만 허용 (JS가 fetch로 호출)
 def analysis_status(request, analysis_id):
-    analysis = get_object_or_404(Analysis, pk=analysis_id)          # 없는 id면 404
+    analysis = get_visible_analysis(request, analysis_id)          # 결과 화면과 같은 규칙: 남의 독립 업로드면 404
 
     is_waiting = analysis.status in (Analysis.STATUS_PENDING, Analysis.STATUS_PROCESSING)  # 아직 안 끝난 상태인지
     if is_waiting and timezone.now() - analysis.created_at > STALE_AFTER:                  # 안 끝났는데 요청한 지 너무 오래됐으면
