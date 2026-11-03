@@ -70,21 +70,18 @@ function attachCommentFormHandler(form) {
         const avatarUrl = document.body.dataset.currentAvatarUrl;
         const avatarImg = avatarUrl ? `<img class="comment-list__avatar" src="${avatarUrl}" alt="${comment.user}">` : "";
 
-        // 서버가 렌더링하는 것과 똑같은 구조로 내부를 채움: 작성자(아바타+링크),
-
-        // 서버가 렌더링하는 것과 똑같은 구조로 내부를 채움: 작성자(아바타+링크), 내용, 수정/삭제 버튼
+       // 서버가 렌더링하는 것과 똑같은 구조로 내부를 채움: 작성자(아바타+링크), 내용, 수정/삭제 버튼
         item.innerHTML = `
             <strong>
                 <a href="/accounts/mypage/${comment.user}/" class="comment-list__username">${avatarImg}${comment.user}</a>
             </strong>
-            <span class="comment-list__content">${comment.content}</span>
+            <span class="comment-list__content"></span>
             <button class="comment-edit-button">수정</button>
             <button class="comment-delete-button">삭제</button>
         `;
-
-        list.appendChild(item);  // 만든 <li>를 목록 맨 끝에 실제로 붙임
-
+        item.querySelector(".comment-list__content").textContent = comment.content;  // 사용자가 쓴 글은 HTML로 해석되지 않게 글자로만 넣음 (XSS 방지)
         // 방금 만든 수정/삭제 버튼에도, 아래에서 만든 함수를 그대로 재사용해서 이벤트를 걸어줌
+        list.appendChild(item);  // 만든 <li>를 목록 맨 끝에 실제로 붙임        
         attachDeleteHandler(item.querySelector(".comment-delete-button"));
         attachEditHandler(item.querySelector(".comment-edit-button"));
         input.value = "";  // 등록 후 입력창을 다시 빈 칸으로 비움
@@ -207,7 +204,7 @@ if (uploadForm) {  // 폼이 있을 때만(=로그인한 경우만) 이벤트를
             <header class="post-card__header">
                 <span class="post-card__username">${post.user}</span>
             </header>
-            <img class="post-card__image" src="${post.image}" alt="${post.caption}">
+            <img class="post-card__image" src="${post.image}" alt="">
             <div class="post-card__actions">
                 <button class="like-button" data-post-id="${post.id}">♡ 0</button>
             </div>
@@ -218,10 +215,11 @@ if (uploadForm) {  // 폼이 있을 때만(=로그인한 경우만) 이벤트를
                     <button type="submit" class="comment-form__submit">게시</button>
                 </form>
             </div>
-            <p class="post-card__caption"><strong>${post.user}</strong> ${post.caption}</p>
+            <p class="post-card__caption"><strong>${post.user}</strong> </p>
         `;
-
+        article.querySelector(".post-card__image").alt = post.caption;    // 속성에 넣을 때도 직접 대입하면 글자로만 들어감
         uploadForm.after(article);  // 업로드 폼 바로 다음(=피드 맨 위)에 새 카드를 끼워 넣음
+        article.querySelector(".post-card__caption").append(post.caption); // append(문자열)은 글자 덩어리로 붙임 → 태그로 해석 안 됨
 
         // 새로 만든 카드 안의 좋아요 버튼/댓글 폼에도 이벤트를 걸어줌 (방금 함수로 분리해둔 덕분에 가능)
         attachLikeHandler(article.querySelector(".like-button"));
