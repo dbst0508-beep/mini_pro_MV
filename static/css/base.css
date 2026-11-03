@@ -168,3 +168,16 @@ main {
     color: var(--color-accent);       /* 새로 추가: hover 시 포인트 컬러 글자 */
     background: var(--color-accent-soft); /* 새로 추가: hover 시 옅은 포인트 컬러 배경 */
 }
+
+.messages {                                         /* 뷰가 남긴 안내 문구 영역 (업로드 실패 등) */
+    list-style: none;                               /* 목록 앞의 점 없애기 */
+    margin: 0;
+    padding: var(--space-md) var(--space-md) 0;
+}
+
+.messages__item {
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-sm);
+    background: #fdecec;                            /* 옅은 빨강 배경: 문제가 있다는 신호 */
+    color: #b42318;                                 /* 진한 빨강 글자 */
+}

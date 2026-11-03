@@ -6,6 +6,9 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required  # 로그인 안 했으면 자동으로 로그인 페이지로 보내주는 데코레이터
 from posts.models import Post  # 다른 앱(posts)의 모델을 가져다 씀 (마이페이지에서 내 게시물을 조회해야 하니까)
 from .models import User
+from django.contrib import messages                          # 화면에 한 번 보여 줄 안내 문구를 남기는 도구
+from django.core.exceptions import ValidationError           # 검사 실패 에러
+from config.validators import validate_uploaded_image        # 업로드 사진 검사 함수
 
 def signup_page(request):  # 회원가입 페이지 뷰
     if request.user.is_authenticated:  # 이미 로그인된 상태라면
@@ -39,7 +42,14 @@ def mypage(request, username=None):
 @login_required(login_url="accounts:login_page")
 @require_POST
 def update_profile_photo(request):
-    request.user.profile_image = request.FILES["profile_image"]
+    image = request.FILES.get("profile_image")                   # 파일이 없으면 None (KeyError 방지)
+    try:
+        validate_uploaded_image(image)                             # 분석 업로드와 같은 검사
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+        return redirect("accounts:mypage")                          # 마이페이지로 돌려보내고 안내 표시
+
+    request.user.profile_image = image
     request.user.save()
     return redirect("accounts:mypage")
 

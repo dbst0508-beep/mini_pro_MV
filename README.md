@@ -26,6 +26,7 @@ accounts/       # 커스텀 유저 모델, 마이페이지/로그인 화면
 posts/          # 게시물, 댓글, 좋아요 (모델 + DRF API)
 analysis/       #  이미지 스타일 분석 (Celery 비동기 파이프라인, Django 측 로직은 완성 / 실제 CV·LLM은 cv_service 연동)
 config/celery.py  # Celery 앱 설정
+config/validators.py  # 업로드 사진 검사 함수 (분석·프로필 사진 업로드가 같이 사용)
 cv_service/     # FastAPI 기반 CV/LLM 분석 서버 (Django와 별도 pyproject.toml/가상환경, 포트 8001). 객체 탐지 + 세부 라벨링 + 비전 LLM(Gemini) 연동 완료
 Dockerfile      # Django + Celery 공용 이미지 (루트), cv_service/Dockerfile은 FastAPI용
 docker-compose.yml  # web, celery, cv_service, redis, db(PostgreSQL) 5개 서비스 구성
@@ -43,6 +44,7 @@ media/          # 업로드된 게시물 이미지
   - `/login/` — 로그인, 이미 로그인한 상태면 피드로 리다이렉트
   - `/logout/` — 로그아웃 (POST 전용, GET 요청으로는 접근 차단)
 - `/mypage/` — 마이페이지, 로그인한 본인 게시물만 3열 그리드로 표시 (비로그인 접근 시 로그인 페이지로 리다이렉트)
+- 프로필 사진 변경은 서버에서 파일 유무·10MB 이하·실제 이미지 여부를 검사하고, 통과하지 못하면 저장하지 않고 화면 상단에 빨간 안내 문구를 표시
 
 ### posts
 - `Post`: 이미지 + 캡션 게시물
@@ -51,6 +53,7 @@ media/          # 업로드된 게시물 이미지
 - `/` : 피드 페이지 (좋아요 개수, 댓글 목록, 로그인 유저의 좋아요 여부 표시)
   - 로그인 유저는 피드 상단 인라인 폼으로 이미지+캡션 게시물 등록 가능 (등록 즉시 새 카드가 피드 최상단에 반영)
   - 댓글 작성 / 수정 / 삭제는 새로고침 없이 JS(`fetch`)로 처리 (작성자 본인만 수정·삭제 가능)
+  - JS로 새로 그리는 댓글·게시물 카드는 사용자가 쓴 글(댓글 내용, 캡션)을 `textContent`/`append`로 넣어 HTML로 해석되지 않게 함 (XSS 방지)
 - DRF API
   - `GET/POST /api/posts/` — 게시물 목록 조회 / 작성
   - `GET/POST /api/posts/<post_id>/comments/` — 댓글 목록 조회 / 작성
@@ -60,7 +63,7 @@ media/          # 업로드된 게시물 이미지
 - API 문서(Swagger): `http://localhost:8000/api/docs/` — 게시물·댓글·좋아요 API를 "게시물/댓글/좋아요" 그룹으로 보여 주고 화면에서 바로 요청을 보낼 수 있음 (명세 원본 데이터는 `/api/schema/`)
   - 세션 로그인 방식이라 같은 브라우저에서 `/login/`으로 먼저 로그인한 뒤 열면 로그인 상태로 요청됨
   - 게시물 작성은 파일 선택 버튼으로 이미지 업로드 가능
-  - AI 분석 주소(`/analysis/...`)는 DRF가 아닌 일반 Django 뷰라 이 문서에서 제외. 분석 서버의 API는 `cv_service`의 `http://localhost:8001/docs`에서 확인 (`/analyze`는 실제 분석을 실행하므로 화면에서 Execute는 비권장)
+  - AI 분석 주소(`/analysis/...`)는 DRF가 아닌 일반 Django 뷰라 이 문서에서 제외.  분석 서버의 API는 터미널로 cv_service를 실행했을 때 `http://localhost:8001/docs`에서 확인 (compose 실행 시에는 보안상 cv_service 포트를 외부에 열지 않음) (`/analyze`는 실제 분석을 실행하므로 화면에서 Execute는 비권장)
 
 ### analysis
 - `Analysis`: 스타일 분석 요청/상태(`대기중`/`분석중`/`완료`/`실패`) 관리. `post` 또는 `image` 둘 중 하나로 "무엇을 분석하는지" 연결(둘 다 nullable), 콜백 검증용 토큰 보유
@@ -75,7 +78,11 @@ media/          # 업로드된 게시물 이미지
 - 로그: `config/settings.py`의 `LOGGING`이 `analysis` 앱 로그를 `시각 단계 파일이름: 내용` 형식으로 터미널(Celery worker 포함)에 출력. `run_analysis`의 실패는 연결 실패·시간 초과는 `logger.error`, 그 밖의 오류는 원인 위치까지 남기는 `logger.exception`으로 기록하고, 콜백 저장 실패도 `logger.exception`으로 기록
 - 두 가지 분석 요청 방식:
   - **게시물 기반**: `/posts/<id>/` 상세 페이지의 "AI 분석 요청" 버튼 — 로그인한 유저라면 소유자 여부와 무관하게 누구나 요청 가능, 재분석도 횟수 제한 없음
-  - **독립 업로드**: `/analysis/` 에서 게시물 없이 이미지 한 장만 업로드해 분석
+  - **독립 업로드**: `/analysis/` 에서 게시물 없이 이미지 한 장만 업로드해 분석. 서버에서 파일 유무·10MB 이하·실제 이미지 여부(`forms.ImageField`로 Pillow 검사)를 확인하고, 통과하지 못하면 분석을 만들지 않고 업로드 화면에 빨간 안내 문구를 표시
+- 콜백 검증 (`/analysis/api/<id>/callback/`)
+  - 콜백 토큰은 `secrets.compare_digest`로 비교 (응답 시간 차이로 토큰이 새지 않게 함), 틀리면 403
+  - 이미 `완료`된 분석에 결과가 또 오면 409로 거절 (결과가 두 벌 저장되지 않음). 토큰 검사를 먼저 하므로 토큰이 없으면 완료 여부도 알 수 없음
+  - `실패`로 처리된 뒤 늦게 도착한 결과는 받아서 `완료`로 되살리고 실패 문구를 지움
 - 분석 대기 중에는 결과 페이지가 3초마다 상태를 폴링(JS `fetch`)해서, 완료되면 자동으로 새로고침됨 (수동 새로고침 불필요)
 - 결과 화면 (게시물 기반/독립 업로드 공용 조각 `templates/analysis/_result_body.html`)
   - 분석한 사진 위에 탐지된 아이템 위치를 번호가 붙은 박스로 표시 (저장된 0~1 정규화 좌표를 % 위치로 변환)
@@ -101,6 +108,10 @@ media/          # 업로드된 게시물 이미지
 ### cv_service (FastAPI)
 - Django와 완전히 분리된 독립 프로젝트 (`cv_service/pyproject.toml`, 자체 가상환경, 포트 8001)
 - `POST /analyze` — 이미지 + `callback_url` + `callback_token`을 받아 분석을 수행하고, 결과를 `callback_url`로 POST
+  - 내부 출입증: `X-Internal-Token` 헤더가 `INTERNAL_API_TOKEN`과 같아야 함 (`secrets.compare_digest`로 비교). 없거나 틀리면, 또는 서버에 값이 설정돼 있지 않으면 401
+  - 콜백 주소 제한(SSRF 방지): `callback_url`의 호스트가 `web`/`localhost`/`127.0.0.1`이 아니면 400. 두 검사 모두 분석(모델·Gemini) 시작 전에 수행
+  - 콜백 전송은 리다이렉트를 따라가지 않음(`allow_redirects=False`)
+  - Docker Compose에서는 포트를 외부에 열지 않아 `web`/`celery`만 내부 네트워크로 접근
 - `GET /health` — 서버 생존 확인용
 - `app/ml_models.py` — 서버 기동 시 모델을 한 번만 로딩 (모듈 레벨 로딩, 요청마다 재로딩 방지)
 - `app/detection.py` — 객체 탐지 모델(`yainage90/fashion-object-detection`, conditional-detr-resnet-50 파인튜닝)로 옷 아이템의 바운딩박스 + 큰 카테고리(상의/하의/아우터/원피스/신발/가방/모자) 탐지, 0~1 정규화 좌표로 변환
@@ -277,11 +288,14 @@ AI 분석 기능은 Redis + Celery worker + cv_service(FastAPI)가 같이 떠 �
 비밀값은 코드에 적지 않고 `.env` 파일에서 읽습니다 (`.env`는 깃 추적과 Docker 이미지에서 제외). 견본 파일을 복사한 뒤 값을 채우세요.
 
 ```bash
-cp .env.example .env                        # Django용: SECRET_KEY, DEBUG, DB 접속 정보
-cp cv_service/.env.example cv_service/.env  # cv_service용: GEMINI_API_KEY
+cp .env.example .env                        # Django용: SECRET_KEY, DEBUG, DB 접속 정보, 내부 토큰
+cp cv_service/.env.example cv_service/.env  # cv_service용: GEMINI_API_KEY, 내부 토큰
 
 # .env의 DJANGO_SECRET_KEY에 넣을 새 키 만들기 ($, # 같은 문자가 섞일 수 있으니 작은따옴표로 감싸서 넣기)
 uv run python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+
+# 두 .env의 INTERNAL_API_TOKEN에 똑같이 넣을 값 만들기
+python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
 | 변수 | 파일 | 설명 |
@@ -290,6 +304,7 @@ uv run python -c "from django.core.management.utils import get_random_secret_key
 | `DJANGO_DEBUG` | `.env` | 정확히 `True`일 때만 켜짐. 값이 없으면 꺼짐 (개발 중에는 `True`) |
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `.env` | Docker의 PostgreSQL 접속 정보 (개발용 값) |
 | `GEMINI_API_KEY` | `cv_service/.env` | Gemini API 키 (발급: Google AI Studio) |
+| `INTERNAL_API_TOKEN` | `.env`, `cv_service/.env` | 두 파일에 같은 값. Django → cv_service 요청의 내부 출입증. Django는 없으면 시작되지 않고, cv_service는 없으면 모든 분석 요청을 거절 |
 
 ### 방법 1 — Docker Compose (권장)
 
@@ -304,7 +319,7 @@ docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
 ```
 
-- 접속: Django `http://localhost:8000` (API 문서 `/api/docs/`), cv_service `http://localhost:8001` (API 문서 `/docs`)
+- 접속: Django `http://localhost:8000` (API 문서 `/api/docs/`). cv_service는 내부 네트워크에서만 접근 가능 (외부 포트 없음)
 - 컨테이너끼리는 서비스 이름(`redis`, `web`, `cv_service`)으로 서로를 부르며, `config/settings.py`가 환경변수(`REDIS_URL`, `INTERNAL_BASE_URL`, `CV_SERVICE_BASE_URL`)로 주소를 읽습니다. 환경변수가 없으면 기존 `localhost` 값을 쓰므로 아래 방법 2도 그대로 동작합니다.
 - DB는 PostgreSQL 컨테이너(`db`)를 사용하고, 데이터는 Docker 볼륨(`postgres_data`)에 저장되어 컨테이너를 지워도 남습니다. `docker compose down -v`는 볼륨까지 지우므로 DB 데이터가 사라집니다. `db`의 포트는 컴퓨터 밖으로 열지 않았으며, 직접 확인하려면 `docker compose exec db psql -U postgres -d mom_vision`을 사용합니다.
 - `config/settings.py`는 환경변수 `POSTGRES_HOST`가 있을 때만 PostgreSQL(`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`)을 사용하고, 없으면 기존 SQLite(`db.sqlite3`)를 사용합니다. 아래 방법 2는 그대로 SQLite로 동작합니다.
@@ -349,11 +364,11 @@ uv run --env-file .env python manage.py test accounts
 uv run --env-file .env python manage.py test analysis
 ```
 
-- settings.py가 `.env`에서 `DJANGO_SECRET_KEY`를 읽으므로 `--env-file .env`가 필요합니다.
+- settings.py가 `.env`에서 `DJANGO_SECRET_KEY`, `INTERNAL_API_TOKEN`을 읽으므로 `--env-file .env`가 필요합니다.
 
 - posts: 좋아요/댓글 생성·조회·수정·삭제, 다른 게시물의 댓글 접근 차단, 게시물 등록 API 테스트 (17개)
-- accounts: 회원가입/로그인/로그아웃/마이페이지 테스트 (13개)
-- analysis: 콜백 토큰 검증·결과 저장(저장 실패 시 전체 롤백 + 실패 처리), 분석 요청 권한(게시물 기반/독립 업로드), 상태 조회의 오래된 분석 실패 전환, 실패 기록 함수, Celery task의 실패 처리(실패 로그 기록 확인 포함), 결과 페이지(사진 표시·재분석 실패 시 이전 결과 표시) 테스트 (19개)
+- accounts: 회원가입/로그인/로그아웃/마이페이지, 프로필 사진 업로드 검사(파일 없음·이미지 아님) 테스트 (15개)
+- analysis: 콜백 토큰 검증·결과 저장(저장 실패 시 전체 롤백 + 실패 처리), 완료된 분석의 중복 콜백 409·토큰 검사 우선·실패 후 늦은 콜백 수용, 분석 요청 권한(게시물 기반/독립 업로드), 독립 업로드 검사(파일 없음·이미지 아님·크기 초과), 상태 조회의 오래된 분석 실패 전환, 실패 기록 함수, Celery task의 실패 처리(실패 로그 기록·내부 토큰 헤더 확인 포함), 결과 페이지(사진 표시·재분석 실패 시 이전 결과 표시) 테스트 (25개)
   - Celery와 cv_service 호출은 `unittest.mock`으로 대체하므로 Redis/Celery/cv_service를 켜지 않아도 실행됩니다.
   - 테스트용 이미지는 임시 폴더에 저장되고 테스트가 끝나면 삭제됩니다 (`media/`에 남지 않음).
 
@@ -364,7 +379,7 @@ cd cv_service
 uv run --env-file .env python -m unittest -v
 ```
 
-- cv_service: 스타일 비율 정리(`normalize_scores`), 라벨 적용(`apply_labels`), 중복 아이템 병합(`merge_duplicates`), Gemini 호출의 성공·실패·잘못된 응답·제한 시간 전달·실패 로그 기록(`interpret_style`), `/analyze` 전체 흐름(콜백 데이터 구성·검색 링크·중복 병합·콜백 실패 시 500) 테스트 (23개)
+- cv_service: 스타일 비율 정리(`normalize_scores`), 라벨 적용(`apply_labels`), 중복 아이템 병합(`merge_duplicates`), Gemini 호출의 성공·실패·잘못된 응답·제한 시간 전달·실패 로그 기록(`interpret_style`), `/analyze` 전체 흐름(콜백 데이터 구성·검색 링크·중복 병합·콜백 실패 시 500), 내부 토큰 검사(없음·틀림·서버 미설정 시 401), 콜백 주소 제한(허용 호스트 통과·속임수 주소 차단·허용 밖 주소 400)과 리다이렉트 미추적 테스트 (30개)
   - Gemini 접속 객체와 탐지·라벨링·콜백 전송을 `unittest.mock`으로 대체하므로 인터넷 연결이나 API 사용량 없이 실행됩니다 (모듈을 불러올 때 API 키를 읽으므로 `--env-file .env`는 필요).
 
 ## 참고

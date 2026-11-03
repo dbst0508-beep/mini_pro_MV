@@ -35,6 +35,13 @@
     </header>
 
     <main>
+        {% if messages %}                                     {# 뷰에서 messages.error(...)로 남긴 안내가 있으면 #}
+        <ul class="messages">
+            {% for message in messages %}
+            <li class="messages__item">{{ message }}</li>       {# 한 번 보여 주면 자동으로 지워짐 #}
+            {% endfor %}
+        </ul>
+        {% endif %}   
         {% block content %}{% endblock %}
     </main>
 

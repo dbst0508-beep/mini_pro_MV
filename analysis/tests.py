@@ -4,7 +4,7 @@ import tempfile  # 임시 폴더를 만들 때 씀
 from datetime import timedelta  # "1초" 같은 시간 간격을 표현할 때 씀
 from io import BytesIO  # 파일을 디스크에 안 만들고 메모리 안에서 다루기 위함
 from unittest.mock import patch  # 테스트 동안만 특정 대상을 "가짜"로 바꿔치기하는 도구
-
+from django.contrib.messages import get_messages
 import requests  # 연결 실패/시간 초과 같은 진짜 예외 종류를 가져다 쓰기 위함
 from PIL import Image  # 진짜 이미지 데이터를 코드로 직접 만들기 위함
 from django.contrib.auth import get_user_model  # 커스텀 User 모델을 안전하게 가져오는 표준 방법
@@ -12,7 +12,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile  # "업로드된 �
 from django.test import TestCase, override_settings  # Django 기본 테스트 도구 + 설정을 잠깐 바꾸는 도구
 from django.urls import reverse  # URL 이름("analysis:callback")으로 실제 주소를 만들어주는 함수
 from django.utils import timezone  # 현재 시각을 가져올 때 씀
-
+from django.conf import settings
 from posts.models import Post  # 분석 대상이 될 게시물
 from .models import Analysis  # 테스트할 분석 모델
 from .tasks import mark_failed, run_analysis  # 테스트할 실패 기록 함수와 분석 task
@@ -110,6 +110,36 @@ class AnalysisCallbackTests(AnalysisTestCase):
         self.assertEqual(self.analysis.status, Analysis.STATUS_FAILED)  # 분석은 "실패"로 표시돼야 함
         self.assertIn("저장하지 못했습니다", self.analysis.error_message)  # 안내 문구가 저장돼야 함
 
+    def test_completed_analysis_rejects_duplicate_callback(self):
+        self.analysis.status = Analysis.STATUS_COMPLETED  # 이미 결과가 저장된 상태로 만듦
+        self.analysis.save()
+        self.payload["style_scores"] = []  # DB 중복 금지 규칙에 우연히 걸리지 않게 비움 → 우리 409 검사만으로 막히는지 확인
+
+        response = self.post_callback(self.payload)
+
+        self.assertEqual(response.status_code, 409)  # 충돌로 거절돼야 함
+        self.assertEqual(self.analysis.detected_items.count(), 0)  # 아이템이 추가로 저장되면 안 됨
+
+    def test_wrong_token_on_completed_gets_403_not_409(self):
+        self.analysis.status = Analysis.STATUS_COMPLETED
+        self.analysis.save()
+        self.payload["callback_token"] = "wrong-token"
+
+        response = self.post_callback(self.payload)
+
+        self.assertEqual(response.status_code, 403)  # 토큰 검사가 먼저: 토큰이 없는 사람에게 "완료됐는지"를 알려 주지 않음
+
+    def test_late_callback_on_failed_analysis_is_accepted(self):
+        mark_failed(self.analysis.id, "분석 시간이 초과되었습니다.")  # 6분이 지나 실패 처리된 상황
+
+        response = self.post_callback(self.payload)  # 그 뒤에 결과가 늦게 도착
+
+        self.assertEqual(response.status_code, 200)  # 받아들여야 함
+        self.analysis.refresh_from_db()
+        self.assertEqual(self.analysis.status, Analysis.STATUS_COMPLETED)  # 완료로 살아나야 함
+        self.assertEqual(self.analysis.error_message, "")  # 실패 문구는 지워져야 함
+        self.assertEqual(self.analysis.detected_items.count(), 1)  # 결과도 저장돼야 함
+
 
 # 분석 요청 테스트 코드 (게시물 기반 A 플로우 + 독립 업로드 B 플로우)
 @patch("analysis.views.run_analysis")  # 이 클래스의 테스트 동안 views.py의 run_analysis를 가짜로 바꿈 → 각 테스트가 mock_task로 받음
@@ -148,6 +178,34 @@ class RequestAnalysisTests(AnalysisTestCase):
             reverse("analysis:standalone_result", args=[new_analysis.id]),  # 단독 결과 페이지로 보내야 함
             fetch_redirect_response=False,
         )
+
+    def test_upload_without_file_is_rejected(self, mock_task):
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("analysis:upload"))  # 파일 없이 제출
+
+        self.assertRedirects(response, reverse("analysis:home"), fetch_redirect_response=False)  # 500이 아니라 업로드 화면으로
+        self.assertEqual(Analysis.objects.count(), 1)  # setUp의 1건 말고 새로 만들어지면 안 됨
+        mock_task.delay.assert_not_called()  # 분석 요청도 가면 안 됨
+
+    def test_upload_non_image_is_rejected(self, mock_task):
+        self.client.force_login(self.user)
+        fake = SimpleUploadedFile("photo.jpg", b"not an image", content_type="image/jpeg")  # 이름과 형식만 사진인 가짜 파일
+        response = self.client.post(reverse("analysis:upload"), {"image": fake})
+
+        self.assertRedirects(response, reverse("analysis:home"), fetch_redirect_response=False)
+        self.assertEqual(Analysis.objects.count(), 1)
+        mock_task.delay.assert_not_called()
+        self.assertTrue(list(get_messages(response.wsgi_request)))  # 실패 안내가 남아 있어야 함
+
+    @patch("config.validators.MAX_UPLOAD_SIZE", 10)  # 진짜 10MB 파일을 만들긴 무거우니, 테스트 동안만 한도를 10바이트로 낮춤
+    def test_upload_too_large_is_rejected(self, mock_task):
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("analysis:upload"), {"image": generate_test_image()})  # 진짜 이미지지만 10바이트보다 큼
+
+        self.assertEqual(Analysis.objects.count(), 1)
+        mock_task.delay.assert_not_called()
+        self.assertIn("10MB", str(list(get_messages(response.wsgi_request))[0]))  # 크기 안내 문구여야 함
+
 # 상태 조회 테스트 코드 (결과 페이지가 3초마다 부르는 주소)
 class AnalysisStatusTests(AnalysisTestCase):
     def setUp(self):
@@ -209,7 +267,7 @@ class RunAnalysisTests(AnalysisTestCase):
         self.assertEqual(sent["data"]["callback_token"], "test-token")  # 이 분석의 토큰을 보냈어야 함
         self.assertIn(f"/analysis/api/{self.analysis.id}/callback/", sent["data"]["callback_url"])  # 이 분석의 콜백 주소를 보냈어야 함
         self.assertIn("timeout", sent)  # 제한 시간을 걸었어야 함
-
+        self.assertEqual(sent["headers"]["X-Internal-Token"], settings.INTERNAL_API_TOKEN)  # 내부 출입증을 실어 보냈어야 함
         self.analysis.refresh_from_db()
         self.assertEqual(self.analysis.status, Analysis.STATUS_PROCESSING)  # 콜백이 오기 전이니 "분석중"이어야 함
 

@@ -1,4 +1,7 @@
 import logging                                              # print 대신 쓰는 기록 도구 (실패 원인을 남길 때 씀)
+from django.contrib import messages                          # 화면에 한 번 보여 줄 안내 문구를 남기는 도구
+from django.core.exceptions import ValidationError           # 검사 실패 에러
+from config.validators import validate_uploaded_image        # 업로드 사진 검사 함수
 from django.db import transaction                           # 여러 DB 저장을 "전부 성공 아니면 전부 취소"로 묶는 도구
 import secrets                                              # 랜덤한 콜백 토큰을 만드는 표준 라이브러리
 from datetime import timedelta                              # "6분" 같은 시간 간격을 표현할 때 씀
@@ -28,8 +31,13 @@ def analysis_callback(request, analysis_id):
 
     data = json.loads(request.body)                              # 요청 본문(bytes 형태 JSON 문자열)을 dict로 변환
 
-    if data.get("callback_token") != analysis.callback_token:     # 요청에 실린 토큰과 DB에 저장된 토큰 비교
+    sent_token = str(data.get("callback_token", ""))              # 요청에 실린 토큰 (없으면 빈 문자열, 숫자 등이 와도 글자로 바꿈)
+    if not secrets.compare_digest(sent_token.encode(), analysis.callback_token.encode()):  # 끝까지 다 비교해서 시간 차이로 정답이 새지 않게 함
         return JsonResponse({"error": "invalid token"}, status=403)  # 안 맞으면 403(권한 없음)으로 거부하고 종료
+
+    if analysis.status == Analysis.STATUS_COMPLETED:                # 토큰은 맞지만 이미 결과가 저장된 분석이면 (같은 콜백이 또 온 경우)
+        return JsonResponse({"error": "already completed"}, status=409)  # 409(충돌): 결과를 두 벌 저장하지 않도록 거절
+    # ponytail: 콜백 두 개가 정확히 동시에 오면 둘 다 이 검사를 통과할 수 있음. cv_service는 한 번만 보내므로 지금은 충분하고, 필요해지면 select_for_update로 행 잠금
 
     try:                                                           # 저장 중 어떤 에러가 나도 아래 except가 받도록 감싸기 시작
         with transaction.atomic():                                   # 이 블록 안의 저장을 한 묶음으로: 중간에 에러가 나면 안에서 저장한 것이 전부 취소됨
@@ -54,6 +62,7 @@ def analysis_callback(request, analysis_id):
 
             analysis.interpretation = data.get("interpretation", "")     # LLM 해석 텍스트 채우기
             analysis.status = Analysis.STATUS_COMPLETED                    # 상태를 "완료"로 변경
+            analysis.error_message = ""                                     # 늦게 도착해 살린 결과라면 남아 있던 실패 문구를 지움
             analysis.save()                                                 # 변경사항 DB에 저장 (여기까지 와야 묶음 전체가 확정됨)
     except Exception:                                                  # 묶음 안에서 무슨 에러가 나도 (이 시점엔 이미 전부 되돌려진 상태)
         logger.exception("분석 #%s 결과 저장 실패", analysis.id)         # 실패 원인(에러 내용과 위치)을 로그에 남김
@@ -99,8 +108,12 @@ def result(request, post_id):
 @login_required                                               # 업로드도 로그인 필수
 @require_POST
 def upload_and_analyze(request):
-    image = request.FILES["image"]                              # home.html 업로드 폼의 <input name="image">에서 올 값
-
+    image = request.FILES.get("image")                          # [...] 대신 .get(): 파일이 없으면 KeyError(500) 대신 None
+    try:
+        validate_uploaded_image(image)                            # 있음 / 10MB 이하 / 진짜 이미지인지 검사
+    except ValidationError as error:
+        messages.error(request, error.messages[0])                 # 실패 이유를 화면에 보여 주도록 남김
+        return redirect("analysis:home")                           # 업로드 화면으로 돌려보냄 (분석은 만들지 않음)
     analysis = Analysis.objects.create(                          # post= 대신 image= 로 생성 (post는 비워둠)
         image=image,
         callback_token=secrets.token_hex(32),

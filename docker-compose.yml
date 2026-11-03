@@ -61,8 +61,5 @@ services:                                   # 띄울 컨테이너(서비스)들�
     build: ./cv_service                     # cv_service 폴더의 Dockerfile로 이미지를 만듦
     env_file:                               # 파일 안의 KEY=값 줄들을 전부 컨테이너 환경변수로 넣어 줌
       - ./cv_service/.env                   # GEMINI_API_KEY가 들어 있는 파일. 이미지에는 굽지 않고 실행할 때만 주입됨
-    ports:
-      - "8001:8001"                         # 내 컴퓨터에서 직접 확인하기 위해 포트 열기
-
 volumes:                                    # compose가 관리하는 이름 있는 볼륨 목록
   postgres_data:                            # DB 데이터를 보관할 볼륨 (위 db 서비스가 이 이름으로 연결함)

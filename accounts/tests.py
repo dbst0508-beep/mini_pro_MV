@@ -1,7 +1,8 @@
 from django.test import TestCase  # 일반 Django 뷰 테스트용 (DRF APITestCase 아님)
 from django.contrib.auth import get_user_model  # 커스텀 User 모델을 안전하게 가져오는 표준 방법
 from posts.models import Post  # 마이페이지 테스트에서 게시물을 직접 만들어봐야 하니까
-
+from django.core.files.uploadedfile import SimpleUploadedFile  # 테스트용 가짜 업로드 파일
+from django.urls import reverse
 
 User = get_user_model()  # accounts.User를 "User"라는 이름으로 사용
 
@@ -115,3 +116,24 @@ class MypageTests(TestCase):  # 마이페이지 테스트 클래스
 
         self.assertEqual(response.status_code, 200)  # 정상적으로 페이지가 떠야 함
         self.assertEqual(list(response.context["posts"]), [Post.objects.get(user=self.user)])  # 화면에 넘어간 게시물 목록이 "내 게시물"만 딱 1개여야 함
+
+class UpdateProfilePhotoTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="photo_user", password="testpass123")
+        self.client.force_login(self.user)
+        self.url = reverse("accounts:update_profile_photo")
+
+    def test_without_file_is_rejected(self):
+        response = self.client.post(self.url)  # 파일 없이 제출
+
+        self.assertRedirects(response, reverse("accounts:mypage"), fetch_redirect_response=False)  # 500이 아니라 마이페이지로
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.profile_image)  # 프로필 사진은 그대로 비어 있어야 함
+
+    def test_non_image_is_rejected(self):
+        fake = SimpleUploadedFile("photo.png", b"not an image", content_type="image/png")  # 이름만 사진인 가짜 파일
+        response = self.client.post(self.url, {"profile_image": fake})
+
+        self.assertRedirects(response, reverse("accounts:mypage"), fetch_redirect_response=False)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.profile_image)  # 저장되면 안 됨
