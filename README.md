@@ -14,7 +14,7 @@ Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일
 - Celery + Redis (AI 분석 비동기 작업 큐)
 - FastAPI + uvicorn (`cv_service/` — CV/LLM 분석 전용 서버, Django와 독립된 가상환경)
 - PyTorch + Transformers + timm (`cv_service/` — 객체 탐지/이미지-텍스트 모델 추론)
-- Gemini API (`google-genai`, `gemini-3.8-flash` — 스타일 비율·해석 텍스트·아이템 세부 라벨 생성)
+- Gemini API (`google-genai`, `gemini-3.5-flash-lite` — 스타일 비율·해석 텍스트·아이템 세부 라벨 생성)
 - 패키지 관리: [uv](https://docs.astral.sh/uv/)
 - Docker + Docker Compose (web / celery / cv_service / redis / db(PostgreSQL) 5개 컨테이너를 한 번에 실행)
 
