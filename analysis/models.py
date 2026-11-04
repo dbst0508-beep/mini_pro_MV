@@ -1,6 +1,12 @@
 from django.db import models
 from django.conf import settings  # settings.AUTH_USER_MODEL(우리 User 모델 이름)을 쓰기 위해
-from django.db import models
+import uuid
+from pathlib import Path
+
+def analysis_image_path(instance, filename):
+    """독립 업로드 사진도 무작위 이름으로 저장"""
+    return f"analysis_uploads/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+
 
 class Analysis(models.Model):
     # status 필드에서 쓸 수 있는 값들을 클래스 상수로 미리 정의
@@ -34,7 +40,7 @@ class Analysis(models.Model):
         null=True, blank=True,  # B 플로우(독립 업로드)는 게시물 없이 분석하므로 비워둘 수 있게 변경
     )
     image = models.ImageField(
-        upload_to="analysis_uploads/",  # B 플로우에서 업로드한 이미지가 저장될 경로 (media/analysis_uploads/)
+        upload_to=analysis_image_path,  # B 플로우 업로드 이미지 → media/analysis_uploads/무작위이름.jpg
         blank=True, null=True,  # post가 있는 A 플로우(게시물 기반)에서는 이 필드가 비어있음
     )
     status = models.CharField(

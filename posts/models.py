@@ -1,5 +1,13 @@
+import uuid                     # 겹치지 않는 무작위 이름을 만들 때 씀
+from pathlib import Path        # 파일명에서 확장자(.jpg)만 꺼낼 때 씀
+
 from django.conf import settings
 from django.db import models
+
+def post_image_path(instance, filename):
+    """원래 파일명은 버리고 '무작위32자.확장자'로 저장 (원래 이름에 담긴 개인정보 노출 방지, URL 추측 방지)"""
+    return f"posts/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+
 
 
 class Post(models.Model):
@@ -8,7 +16,7 @@ class Post(models.Model):
         on_delete=models.CASCADE,
         related_name="posts",
     )
-    image = models.ImageField(upload_to="posts/")
+    image = models.ImageField(upload_to=post_image_path)
     caption = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
