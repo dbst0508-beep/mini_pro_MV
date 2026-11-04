@@ -36,7 +36,7 @@ class AnalysisAdmin(admin.ModelAdmin):                    # 분석 기록이 어
     list_select_related = ["post", "user"]                # 게시물과 요청한 사람을 JOIN으로 한 번에 가져옴 (목록에 둘 다 표시하므로)
     ordering = ["-created_at"]                            # 최신 분석이 위로
     fields = ["preview_large", "user", "post", "image", "status", "error_message", "interpretation", "callback_token", "created_at", "updated_at"]  # 상세 화면 칸 순서 (분석한 사진 → 요청한 사람 → ...)
-    readonly_fields = ["preview_large", "post", "image", "error_message", "interpretation", "callback_token", "created_at", "updated_at"]  # 상태 외에는 전부 보기 전용 (콜백 토큰은 보안값이라 수정 금지)
+    list_filter = ["status", "created_at"]                # 오른쪽 필터: 상태별(대기중/분석중/완료/실패), 날짜별
     inlines = [DetectedItemInline, StyleScoreInline]      # 상세 화면 아래에 아이템 표와 스타일 비율 표를 같이 보여줌
     readonly_fields = ["preview_large", "user", "post", "image", "error_message", "interpretation", "callback_token", "created_at", "updated_at"]  # 상태 외에는 전부 보기 전용 (요청한 사람도 바꾸면 안 됨)
     def get_queryset(self, request):                      # 목록에 쓸 데이터를 가져오는 함수 (어드민이 호출)
