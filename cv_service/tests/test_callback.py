@@ -45,14 +45,4 @@ class SendCallbackTests(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
-    def test_does_not_follow_redirects(self, mock_post):
-        """리다이렉트를 따라가지 않도록 설정해서 보낸다"""
-        payload = CallbackPayload(callback_token="t")  # 나머지 필드는 기본값(빈 리스트/빈 문자열)
 
-        send_callback("http://web:8000/callback/", payload)
-
-        self.assertIs(mock_post.call_args.kwargs["allow_redirects"], False)
-
-
-if __name__ == "__main__":
-    unittest.main()
