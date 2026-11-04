@@ -7,6 +7,7 @@ erDiagram
     User ||--o{ Post : "작성"
     User ||--o{ Comment : "작성"
     User ||--o{ Like : "누름"
+    User |o--o{ Analysis : "요청 (없을 수 있음)"
     Post ||--o{ Comment : "가짐"
     Post ||--o{ Like : "가짐"
     Post |o--o{ Analysis : "분석 대상 (없을 수 있음)"
@@ -16,12 +17,12 @@ erDiagram
     User {
         int id PK
         string username "AbstractUser 기본 필드"
-        image profile_image "profiles/, 비워둘 수 있음"
+        image profile_image "profiles/UUID, 비워둘 수 있음"
     }
     Post {
         int id PK
         int user_id FK
-        image image "posts/"
+        image image "posts/UUID"
         text caption "비워둘 수 있음"
         datetime created_at
     }
@@ -40,8 +41,9 @@ erDiagram
     }
     Analysis {
         int id PK
+        int user_id FK "요청한 사람, 비워둘 수 있음 (옛 분석)"
         int post_id FK "비워둘 수 있음 (B 플로우)"
-        image image "analysis_uploads/, 비워둘 수 있음 (A 플로우)"
+        image image "analysis_uploads/UUID, 비워둘 수 있음 (A 플로우)"
         string status "pending/processing/completed/failed"
         string callback_token "unique"
         text error_message
@@ -76,13 +78,14 @@ erDiagram
 ```
 User ─┬─< Post ─┬─< Comment >─ User
       │         ├─< Like    >─ User
-      │         └─< Analysis (post는 비워둘 수 있음)
+      │         └─< Analysis (post는 비워둘 수 있음) >─ User (요청한 사람)
       │                 ├─< DetectedItem
       │                 └─< StyleScore
 ```
 
 - Comment와 Like는 **Post와 User 양쪽**에 FK로 연결됨 ("어느 글에" + "누가")
-- Analysis는 Post에만 연결되고, B 플로우에서는 Post 없이 혼자 존재할 수 있음
+- Analysis는 Post(무엇을 분석했나)와 User(누가 요청했나)에 연결됨. B 플로우에서는 Post 없이 존재할 수 있음
+- 업로드 사진 3곳(`profile_image`, `Post.image`, `Analysis.image`)은 모두 원래 파일명 대신 `폴더/<UUID 32자>.확장자`로 저장됨 (`upload_to`에 경로를 만드는 함수를 넣음)
 
 ### 앱 구조 (모델 관련성 기준 3개 앱으로 분리)
 
@@ -100,13 +103,13 @@ User ─┬─< Post ─┬─< Comment >─ User
 from django.contrib.auth.models import AbstractUser
 
 class User(AbstractUser):
-    profile_image = models.ImageField(upload_to="profiles/", blank=True, null=True)
+    profile_image = models.ImageField(upload_to=profile_image_path, blank=True, null=True)  # profiles/<UUID>.확장자
 ```
 
 | 필드 | 타입 | 비고 |
 |---|---|---|
 | (username, password, email 등) | - | `AbstractUser`가 기본 제공 |
-| profile_image | ImageField | upload_to="profiles/", 비워둘 수 있음 |
+| profile_image | ImageField | upload_to=`profile_image_path` (profiles/UUID), 비워둘 수 있음 |
 
 **`settings.py`에 `AUTH_USER_MODEL = "accounts.User"`를 첫 migrate 전에 지정해야** 나중에 필드를 추가할 때 DB를 갈아엎지 않아도 됨.
 → 실제로 나중에 `profile_image`를 추가할 때 migrate만으로 끝남.
@@ -116,7 +119,7 @@ class User(AbstractUser):
 | 필드 | 타입 | 비고 |
 |---|---|---|
 | user | FK → User | 작성자, related_name="posts" |
-| image | ImageField | upload_to="posts/" |
+| image | ImageField | upload_to=`post_image_path` (posts/UUID) |
 | caption | TextField | blank=True (캡션 없이 올려도 됨) |
 | created_at | DateTimeField | auto_now_add |
 
@@ -142,8 +145,9 @@ class User(AbstractUser):
 
 | 필드 | 타입 | 비고 |
 |---|---|---|
+| user | FK → User | 요청한 사람, related_name="analyses", **null=True** (이 칸 추가 전의 분석은 비어 있음). 독립 업로드 결과를 본인만 보게 할 때 사용 |
 | post | **FK**(1:N, 재분석 허용) → posts.Post | **null=True** (B 플로우는 게시물 없음) |
-| image | ImageField | upload_to="analysis_uploads/", **B 플로우에서만 채워짐** |
+| image | ImageField | upload_to=`analysis_image_path` (analysis_uploads/UUID), **B 플로우에서만 채워짐** |
 | status | CharField + choices | pending/processing/completed/failed |
 | callback_token | CharField (unique) | FastAPI 콜백 검증용 |
 | error_message | TextField | 실패 시 에러 내용 |
