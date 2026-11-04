@@ -14,7 +14,7 @@ Django(+DRF)로 웹/API 서버를 구성하고, 게시물 이미지의 스타일
 - Celery + Redis (AI 분석 비동기 작업 큐)
 - FastAPI + uvicorn (`cv_service/` — CV/LLM 분석 전용 서버, Django와 독립된 가상환경)
 - PyTorch + Transformers + timm (`cv_service/` — 객체 탐지/이미지-텍스트 모델 추론)
-- Gemini API (`google-genai`, `gemini-3.8-flash` — 스타일 비율·해석 텍스트·아이템 세부 라벨 생성)
+- Gemini API (`google-genai`, `gemini-3.5-flash-lite` — 스타일 비율·해석 텍스트·아이템 세부 라벨 생성)
 - 패키지 관리: [uv](https://docs.astral.sh/uv/)
 - Docker + Docker Compose (web / celery / cv_service / redis / db(PostgreSQL) 5개 컨테이너를 한 번에 실행)
 
@@ -32,7 +32,7 @@ Dockerfile      # Django + Celery 공용 이미지 (루트), cv_service/Dockerfi
 docker-compose.yml  # web, celery, cv_service, redis, db(PostgreSQL) 5개 서비스 구성
 templates/      # 서버 렌더링 템플릿 (feed, mypage, login, analysis)
 static/         #  CSS(디자인 시스템 변수 기반), JS, 이미지
-media/          # 업로드된 게시물 이미지
+media/          # 업로드 이미지 (posts/ 게시물, profiles/ 프로필, analysis_uploads/ 독립 분석). 파일명은 UUID
 ```
 
 ## 앱별 기능
@@ -44,10 +44,12 @@ media/          # 업로드된 게시물 이미지
   - `/login/` — 로그인, 이미 로그인한 상태면 피드로 리다이렉트
   - `/logout/` — 로그아웃 (POST 전용, GET 요청으로는 접근 차단)
 - `/mypage/` — 마이페이지, 로그인한 본인 게시물만 3열 그리드로 표시 (비로그인 접근 시 로그인 페이지로 리다이렉트)
-- 프로필 사진 변경은 서버에서 파일 유무·10MB 이하·실제 이미지 여부를 검사하고, 통과하지 못하면 저장하지 않고 화면 상단에 빨간 안내 문구를 표시
+- `/mypage/<username>/` — 다른 유저의 페이지 (로그인 여부와 무관하게 조회, 없는 유저면 404). 프로필 사진 변경은 본인 페이지에서만 가능
+- 프로필 사진 변경(`POST /mypage/photo/`)은 서버에서 파일 유무·10MB 이하·실제 이미지 여부를 검사하고, 통과하지 못하면 저장하지 않고 화면 상단에 빨간 안내 문구를 표시
 
 ### posts
 - `Post`: 이미지 + 캡션 게시물
+- 업로드 파일명: 게시물·프로필·독립 분석 사진 모두 원래 파일명을 버리고 `폴더/<UUID 32자>.확장자`로 저장 (원래 이름에 담긴 개인정보 노출과 URL 추측 방지). 경로를 정하는 함수는 각 앱의 `models.py`에 있음 (`post_image_path`, `profile_image_path`, `analysis_image_path`)
 - `Comment`: 게시물별 댓글 (N:1)
 - `Like`: 게시물별 좋아요 (post, user 조합 unique)
 - `/` : 피드 페이지 (좋아요 개수, 댓글 목록, 로그인 유저의 좋아요 여부 표시)
@@ -66,7 +68,7 @@ media/          # 업로드된 게시물 이미지
   - AI 분석 주소(`/analysis/...`)는 DRF가 아닌 일반 Django 뷰라 이 문서에서 제외.  분석 서버의 API는 터미널로 cv_service를 실행했을 때 `http://localhost:8001/docs`에서 확인 (compose 실행 시에는 보안상 cv_service 포트를 외부에 열지 않음) (`/analyze`는 실제 분석을 실행하므로 화면에서 Execute는 비권장)
 
 ### analysis
-- `Analysis`: 스타일 분석 요청/상태(`대기중`/`분석중`/`완료`/`실패`) 관리. `post` 또는 `image` 둘 중 하나로 "무엇을 분석하는지" 연결(둘 다 nullable), 콜백 검증용 토큰 보유
+- `Analysis`: 스타일 분석 요청/상태(`대기중`/`분석중`/`완료`/`실패`) 관리. `post` 또는 `image` 둘 중 하나로 "무엇을 분석하는지" 연결(둘 다 nullable), 콜백 검증용 토큰 보유. `user`에 분석을 요청한 사람을 기록 (게시물 기반이면 게시물 주인이 아니라 요청한 사람, 이 칸이 생기기 전의 분석은 비어 있음)
 - `DetectedItem`: 분석으로 검출된 의류 아이템(카테고리, 바운딩 박스, 쇼핑 검색 링크)
 - `StyleScore`: 스타일별 비율 점수
 - Celery task(`run_analysis`)는 이미지를 `cv_service`의 `/analyze`로 전달하고, `cv_service`가 결과를 Django 콜백으로 되돌려주는 구조로 연동되어 있음. 비동기 파이프라인(요청 → FastAPI 호출 → 콜백 → 상태 전환) 전체가 실제 모델 기반으로 동작함 — `detected_items`의 카테고리/바운딩박스는 CV 탐지 모델, 세부 라벨·`style_scores`·`interpretation`은 Gemini가 생성한 결과.
@@ -83,6 +85,10 @@ media/          # 업로드된 게시물 이미지
   - 콜백 토큰은 `secrets.compare_digest`로 비교 (응답 시간 차이로 토큰이 새지 않게 함), 틀리면 403
   - 이미 `완료`된 분석에 결과가 또 오면 409로 거절 (결과가 두 벌 저장되지 않음). 토큰 검사를 먼저 하므로 토큰이 없으면 완료 여부도 알 수 없음
   - `실패`로 처리된 뒤 늦게 도착한 결과는 받아서 `완료`로 되살리고 실패 문구를 지움
+- 결과 접근 제한 (`get_visible_analysis`)
+  - 게시물 기반 분석: 게시물이 피드에 공개돼 있으므로 결과와 상태 조회도 누구나 가능
+  - 독립 업로드 분석: 결과 화면(`/analysis/<id>/result/`)과 상태 조회 API 모두 **요청한 본인만** 가능. 남이나 비로그인 사용자는 403이 아니라 404 (분석이 존재하는지도 알 수 없게)
+  - 주인 칸(`user`)이 비어 있는 옛날 독립 업로드는 아무에게도 보이지 않음 (관리자 화면에서만 확인)
 - 분석 대기 중에는 결과 페이지가 3초마다 상태를 폴링(JS `fetch`)해서, 완료되면 자동으로 새로고침됨 (수동 새로고침 불필요)
 - 결과 화면 (게시물 기반/독립 업로드 공용 조각 `templates/analysis/_result_body.html`)
   - 분석한 사진 위에 탐지된 아이템 위치를 번호가 붙은 박스로 표시 (저장된 0~1 정규화 좌표를 % 위치로 변환)
@@ -92,17 +98,17 @@ media/          # 업로드된 게시물 이미지
 - 주요 경로
   - `/analysis/` — 업로드 폼 (분석 홈)
   - `/posts/<post_id>/` 상세 페이지 내 요청 버튼 → `/analysis/post/<post_id>/request/`, 결과는 `/analysis/post/<post_id>/result/`
-  - `/analysis/upload/` — 독립 업로드 처리, 결과는 `/analysis/<analysis_id>/result/`
-  - `/analysis/api/<analysis_id>/callback/` — Celery task → Django 콜백 (토큰 검증)
-  - `/analysis/api/<analysis_id>/status/` — 결과 페이지 폴링용 상태 조회 API (오래된 미완료 분석의 실패 전환도 여기서 처리)
+  - `/analysis/upload/` — 독립 업로드 처리 (로그인 필수), 결과는 `/analysis/<analysis_id>/result/` (요청한 본인만)
+  - `/analysis/api/<analysis_id>/callback/` — cv_service → Django 콜백 (토큰 검증)
+  - `/analysis/api/<analysis_id>/status/` — 결과 페이지 폴링용 상태 조회 API (오래된 미완료 분석의 실패 전환도 여기서 처리, 독립 업로드는 요청한 본인만)
 
 ### 관리자 페이지 (Django Admin, `/admin/`)
 - **게시물 중심 화면**: 게시물 하나를 열면 사진, AI 분석 결과(해석·스타일 비율 표·탐지 아이템 표), 댓글, 좋아요가 한 화면에 모임. 탐지 아이템·스타일 비율·댓글·좋아요는 별도 메뉴 없이 게시물(또는 분석) 안에서 확인
   - 게시물 목록: 썸네일, 분석 수·좋아요 수·댓글 수(클릭 정렬), 검색(캡션·작성자·댓글 내용)
   - 댓글 삭제 가능(내용 수정은 불가), 좋아요는 보기 전용
-- **분석 화면** (`Analysis`): 게시물 없이 올린 독립 업로드 분석의 보관 장소. 분석한 사진 미리보기, 상태 필터(대기중/분석중/완료/실패), 탐지 아이템 수·실패 사유 표시
+- **분석 화면** (`Analysis`): 게시물 없이 올린 독립 업로드 분석의 보관 장소. 분석한 사진 미리보기, 요청한 사람, 상태 필터(대기중/분석중/완료/실패), 탐지 아이템 수·실패 사유 표시
 - 표시 이름 통일: `게시물 #1 (캡션) · 분석 #2`, `독립 업로드 · 분석 #3`처럼 어느 게시물의 데이터인지 항상 보임
-- AI 결과·콜백 토큰은 읽기 전용, 분석·아이템·좋아요 직접 추가 불가 (분석 상태만 수정 가능)
+- AI 결과·콜백 토큰·요청한 사람은 읽기 전용, 분석·아이템·좋아요 직접 추가 불가 (분석 상태만 수정 가능)
 - 알려진 아쉬운 점: 사이드바에 `Analysiss`로 표시됨(자동 복수형), 인라인 줄 제목이 한 번 더 나옴
 
 ### cv_service (FastAPI)
@@ -118,7 +124,8 @@ media/          # 업로드된 게시물 이미지
 - `app/labeling.py` — 탐지된 박스 영역을 크롭해 세부 라벨링 모델(`patrickjohncyh/fashion-clip`)로 zero-shot 세부 분류 (카테고리별 한글 후보 라벨 목록 기반). Gemini 호출이 실패했을 때 쓰는 예비 라벨 역할이며, 카테고리와 라벨이 같은 중복 아이템(좌우 신발 등)을 합치는 `merge_duplicates`도 포함
 - `app/interpretation.py` — 사진과 탐지 결과(번호·카테고리·위치)를 Gemini에 보내 스타일 비율(`style_scores`), 해석 텍스트(`interpretation`), 아이템별 세부 라벨을 한 번의 호출로 생성. 구조화 출력(JSON 스키마)을 사용하고, 스타일 이름 중복 병합과 비율 합 100 정규화를 거침 (반올림 오차는 마지막 스타일이 남은 값을 가져가 합이 정확히 100이 됨)
 - Gemini 호출이 성공하면 세부 라벨을 Gemini 결과로 덮어쓰고, 실패하면 FashionCLIP 라벨과 안내 문구로 대체해 탐지 결과는 그대로 저장
-- Gemini 응답 지연 대비: 요청 한 번당 30초 제한(`LLM_TIMEOUT`), 서버 혼잡(503) 시 재시도 1회(`LLM_RETRY_ATTEMPTS`)로 제한 → Gemini가 응답하지 않아도 약 1분 안에 탐지 결과만으로 분석이 완료됨 (제한이 없을 때는 Celery의 300초 제한에 걸려 분석 전체가 실패했음)
+- Gemini 응답 지연 대비: 요청 한 번당 60초 제한(`LLM_TIMEOUT`), 서버 혼잡(503) 시 재시도 1회(`LLM_RETRY_ATTEMPTS`)로 제한 → Gemini가 응답하지 않아도 Celery의 300초 제한보다 훨씬 먼저 탐지 결과만으로 분석이 완료됨 (제한이 없을 때는 300초 제한에 걸려 분석 전체가 실패했음)
+  - 처음(#22)에는 30초였고, 이때 503은 약 30초 만에 돌아와 최악의 경우 약 64초(30초 × 2번)였음. 모델을 `gemini-3.5-flash-lite`로 바꾸면서(#32) 60초로 늘렸으므로, Gemini가 아예 응답하지 않는 경우 최악은 약 2분
 - 로그: `app/main.py`의 `logging.basicConfig`로 `시각 단계 파일이름: 내용` 형식을 설정하고, Gemini 호출 실패는 `logger.warning`으로 기록
 - API 키는 `cv_service/.env`의 `GEMINI_API_KEY`로 관리 (깃 추적 제외, 견본은 `cv_service/.env.example`)
 
@@ -358,8 +365,11 @@ uv run --env-file .env python manage.py runserver
 
 ## 테스트 실행
 
+자동 테스트는 모두 92개입니다 (Django 62 + cv_service 30).
+
 ```bash
-uv run --env-file .env python manage.py test posts
+uv run --env-file .env python manage.py test            # Django 전체 (62개)
+uv run --env-file .env python manage.py test posts      # 앱 하나만 실행할 때
 uv run --env-file .env python manage.py test accounts
 uv run --env-file .env python manage.py test analysis
 ```
@@ -368,7 +378,7 @@ uv run --env-file .env python manage.py test analysis
 
 - posts: 좋아요/댓글 생성·조회·수정·삭제, 다른 게시물의 댓글 접근 차단, 게시물 등록 API 테스트 (17개)
 - accounts: 회원가입/로그인/로그아웃/마이페이지, 프로필 사진 업로드 검사(파일 없음·이미지 아님) 테스트 (15개)
-- analysis: 콜백 토큰 검증·결과 저장(저장 실패 시 전체 롤백 + 실패 처리), 완료된 분석의 중복 콜백 409·토큰 검사 우선·실패 후 늦은 콜백 수용, 분석 요청 권한(게시물 기반/독립 업로드), 독립 업로드 검사(파일 없음·이미지 아님·크기 초과), 상태 조회의 오래된 분석 실패 전환, 실패 기록 함수, Celery task의 실패 처리(실패 로그 기록·내부 토큰 헤더 확인 포함), 결과 페이지(사진 표시·재분석 실패 시 이전 결과 표시) 테스트 (25개)
+- analysis: 콜백 토큰 검증·결과 저장(저장 실패 시 전체 롤백 + 실패 처리), 완료된 분석의 중복 콜백 409·토큰 검사 우선·실패 후 늦은 콜백 수용, 분석 요청 권한(게시물 기반/독립 업로드)과 요청한 사람 기록, 독립 업로드 검사(파일 없음·이미지 아님·크기 초과)와 UUID 파일명, 독립 업로드 결과·상태 조회의 본인 제한(본인 200·남 404·비로그인 404·주인 없는 옛 분석 숨김·게시물 기반은 공개 유지), 상태 조회의 오래된 분석 실패 전환, 실패 기록 함수, Celery task의 실패 처리(실패 로그 기록·내부 토큰 헤더 확인 포함), 결과 페이지(사진 표시·재분석 실패 시 이전 결과 표시) 테스트 (30개)
   - Celery와 cv_service 호출은 `unittest.mock`으로 대체하므로 Redis/Celery/cv_service를 켜지 않아도 실행됩니다.
   - 테스트용 이미지는 임시 폴더에 저장되고 테스트가 끝나면 삭제됩니다 (`media/`에 남지 않음).
 
@@ -385,10 +395,12 @@ uv run --env-file .env python -m unittest -v
 ## 참고
 
 - 모델 설계(ERD)는 [`docs/erd.md`](docs/erd.md)에 있습니다.
+- 작업별 상세 기록(왜 바꿨는지, 코드 해설, 트러블슈팅)은 `docs/날짜-주제.md`에 있습니다. 보안 작업은 [`.env` 분리](docs/2026-10-30-security-env.md), [내부 통신·업로드 검사](docs/2026-11-03-security-callback-upload.md), [분석 주인·본인만 보기·UUID](docs/2026-11-05-security-ownership-uuid.md) 순서입니다.
 - `LANGUAGE_CODE`, `TIME_ZONE`은 한국(`ko-kr`, `Asia/Seoul`) 기준으로 설정되어 있습니다.
 - `SECRET_KEY`는 `.env`에서 읽습니다. 예전에 코드에 적혀 있던 키는 git 기록에 남아 있어 폐기했고, 새로 만든 키로 교체했습니다.
 - 이미지 분석을 담당할 `cv_service`(FastAPI)는 이 저장소에 포함되어 있으며, 실제 객체 탐지 + 세부 라벨링 모델이 동작합니다. 스타일 비율/해석 텍스트/세부 라벨은 Gemini API로 생성하며, Django ↔ FastAPI 간 비동기 요청→콜백→상태 전환 전체 흐름은 검증된 상태입니다.
 - `cv_service`를 처음 실행하면 허깅페이스에서 모델 가중치를 다운로드하므로 기동에 시간이 걸릴 수 있습니다 (직접 실행 시 이후엔 로컬 캐시 사용). Docker로 실행하면 컨테이너를 새로 만들 때마다 다시 내려받습니다 (모델 캐시 볼륨 연결은 추후 과제).
 - Docker 구성 관련 한계: `redis`는 `depends_on`이 시작 순서만 보장합니다(`db`는 `healthcheck`로 준비 완료까지 대기). 서버는 개발용 `runserver`입니다 (`DEBUG=False`로 바꾸면 CSS·이미지가 나오지 않으므로, 배포 단계에서 whitenoise/nginx와 함께 전환 예정). 자동 테스트(`manage.py test`)는 Docker 없이 SQLite로 실행하는 것을 기준으로 합니다.
 - 알려진 한계: 작은 신발/부츠는 탐지되지 않을 수 있습니다 (탐지 모델이 해당 박스를 낮은 점수로만 인식하며, 기준값 조정으로는 해결되지 않음). Gemini 해석 글에는 언급되지만 박스는 표시되지 않습니다. 근본 해결은 고도화 단계에서 다룹니다.
+- 아직 없는 보호 장치: 분석 요청 횟수 제한, 로그인 시도 횟수 제한 (다음 작업 예정). 업로드 사진은 UUID로 주소를 짐작할 수 없게 했지만, `/media/` 주소를 아는 사람은 로그인 없이 열 수 있습니다.
 - 서버를 켠 직후의 첫 분석은 모델 준비 시간 때문에 1분 이상 걸릴 수 있고, 이후 분석은 수 초 내에 끝납니다.

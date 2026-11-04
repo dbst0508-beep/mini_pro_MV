@@ -31,15 +31,14 @@ class StyleScoreInline(admin.TabularInline):              # 분석 상세 화면
 
 @admin.register(Analysis)                                 # Analysis를 어드민에 등록
 class AnalysisAdmin(admin.ModelAdmin):                    # 분석 기록이 어드민에서 어떻게 보일지 정하는 클래스
-    list_display = ["__str__", "preview", "status", "item_count", "short_error", "created_at", "updated_at"]  # 목록 컬럼들 (__str__ = 위에서 바꾼 "게시물 #1 (캡션) · 분석 #3" 이름)
-    list_filter = ["status", "created_at"]                # 오른쪽 필터: 상태별(대기중/분석중/완료/실패), 날짜별
+    list_display = ["__str__", "user", "preview", "status", "item_count", "short_error", "created_at", "updated_at"]  # 목록 컬럼들 (__str__ = "게시물 #1 (캡션) · 분석 #3", user = 요청한 사람)
     search_fields = ["error_message", "interpretation", "post__caption"]  # 에러 내용, 해석 글, 연결된 게시물 캡션으로 검색
-    list_select_related = ["post"]                        # 연결된 게시물을 JOIN으로 한 번에 가져옴 (이름에 캡션이 들어가서 필요)
+    list_select_related = ["post", "user"]                # 게시물과 요청한 사람을 JOIN으로 한 번에 가져옴 (목록에 둘 다 표시하므로)
     ordering = ["-created_at"]                            # 최신 분석이 위로
-    fields = ["preview_large", "post", "image", "status", "error_message", "interpretation", "callback_token", "created_at", "updated_at"]  # 상세 화면 칸 순서 (분석한 사진이 맨 위)
-    readonly_fields = ["preview_large", "post", "image", "error_message", "interpretation", "callback_token", "created_at", "updated_at"]  # 상태 외에는 전부 보기 전용 (콜백 토큰은 보안값이라 수정 금지)
+    fields = ["preview_large", "user", "post", "image", "status", "error_message", "interpretation", "callback_token", "created_at", "updated_at"]  # 상세 화면 칸 순서 (분석한 사진 → 요청한 사람 → ...)
+    list_filter = ["status", "created_at"]                # 오른쪽 필터: 상태별(대기중/분석중/완료/실패), 날짜별
     inlines = [DetectedItemInline, StyleScoreInline]      # 상세 화면 아래에 아이템 표와 스타일 비율 표를 같이 보여줌
-
+    readonly_fields = ["preview_large", "user", "post", "image", "error_message", "interpretation", "callback_token", "created_at", "updated_at"]  # 상태 외에는 전부 보기 전용 (요청한 사람도 바꾸면 안 됨)
     def get_queryset(self, request):                      # 목록에 쓸 데이터를 가져오는 함수 (어드민이 호출)
         queryset = super().get_queryset(request)          # 기본 분석 목록을 먼저 받아 옴
         return queryset.annotate(_item_count=Count("detected_items", distinct=True))  # 분석마다 탐지된 아이템 수를 계산해서 붙임
