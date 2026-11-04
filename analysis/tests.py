@@ -174,6 +174,7 @@ class RequestAnalysisTests(AnalysisTestCase):
         self.assertIsNone(new_analysis.post)  # 게시물 없이 만들어져야 함
         self.assertEqual(new_analysis.user, self.user)  # 업로드한 사람이 분석의 주인이어야 함        
         self.assertTrue(new_analysis.image)  # 업로드한 사진이 저장돼 있어야 함
+        self.assertRegex(new_analysis.image.name, r"^analysis_uploads/[0-9a-f]{32}\.jpg$")  # 원래 이름(test.jpg)이 아니라 무작위 32자로 저장돼야 함
         mock_task.delay.assert_called_once_with(new_analysis.id)
         self.assertRedirects(
             response,
