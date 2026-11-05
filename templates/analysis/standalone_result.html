@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}AI 분석 결과{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/analysis.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/analysis.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="analysis-result">
+    <a href="{% url 'analysis:home' %}" class="detail__back">← AI 분석으로 돌아가기</a>  {# B 플로우는 게시글이 없어서 analysis:home으로 #}
+
+    {% include "analysis/_result_body.html" %}                        {# 사진 + 결과/실패/분석 중 화면 (공용 조각) #}
+</div>
+{% endblock %}

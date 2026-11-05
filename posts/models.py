@@ -1,5 +1,13 @@
+import uuid                     # 겹치지 않는 무작위 이름을 만들 때 씀
+from pathlib import Path        # 파일명에서 확장자(.jpg)만 꺼낼 때 씀
+
 from django.conf import settings
 from django.db import models
+
+def post_image_path(instance, filename):
+    """원래 파일명은 버리고 '무작위32자.확장자'로 저장 (원래 이름에 담긴 개인정보 노출 방지, URL 추측 방지)"""
+    return f"posts/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+
 
 
 class Post(models.Model):
@@ -8,12 +16,14 @@ class Post(models.Model):
         on_delete=models.CASCADE,
         related_name="posts",
     )
-    image = models.ImageField(upload_to="posts/")
+    image = models.ImageField(upload_to=post_image_path)
     caption = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.user} - {self.created_at:%Y-%m-%d}"
+    def __str__(self):                                        # 어드민·셸에서 게시물을 문자열로 보여줄 때 쓰는 이름
+        if self.caption:                                      # 캡션이 있으면
+            return f"게시물 #{self.pk} ({self.caption[:20]})"    # "게시물 #1 (오늘의 코디)"처럼 번호 + 캡션 앞 20글자
+        return f"게시물 #{self.pk}"                             # 캡션이 비어 있으면 번호만 표시
 
 class Comment(models.Model):
     # 이 댓글이 어느 게시물에 달린 것인지 연결 (N:1 관계)
@@ -31,9 +41,8 @@ class Comment(models.Model):
     content = models.TextField()  # 댓글 본문 텍스트, 길이 제한 없음
     created_at = models.DateTimeField(auto_now_add=True)  # 작성 시각, 생성 시 한 번만 자동 기록
 
-    def __str__(self):
-        # admin/shell에서 이 객체를 출력할 때 "작성자 - 댓글앞부분" 형태로 보여줌
-        return f"{self.user} - {self.content[:20]}"
+    def __str__(self):                                        # 댓글을 문자열로 보여줄 때 쓰는 이름
+        return f"{self.post} · {self.user} · {self.content[:20]}"  # "게시물 #1 (캡션) · 작성자 · 댓글 앞부분"처럼 어느 게시물의 누구 댓글인지까지 표시
     
 class Like(models.Model):
     # 어느 게시물에 좋아요를 눌렀는지 연결
@@ -54,6 +63,6 @@ class Like(models.Model):
         # 같은 (post, user) 조합이 두 번 생기지 못하게 DB 레벨에서 막음
         unique_together = ("post", "user")
 
-    def __str__(self):
-        return f"{self.user} likes {self.post}"
+    def __str__(self):                                        # 좋아요를 문자열로 보여줄 때 쓰는 이름
+        return f"{self.post} ← {self.user}"                    # "게시물 #1 (캡션) ← 누른 사람"처럼 어느 게시물에 누가 눌렀는지 표시
 

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}AI 분석 결과{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/analysis.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/analysis.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="analysis-result">
+    <a href="{% url 'posts:detail' post.id %}" class="detail__back">← 게시글로 돌아가기</a>
+
+    {% if analysis %}
+        {% if failed_retry %}                                         {# 재분석은 실패했지만 이전 결과가 있을 때 #}
+        <p class="analysis-result__notice">최근 재분석에 실패해 이전 분석 결과를 보여드립니다. ({{ failed_retry.error_message }})</p>
+        {% endif %}
+        {% include "analysis/_result_body.html" %}                    {# 사진 + 결과/실패/분석 중 화면 (공용 조각) #}
+    {% else %}                                                        {# analysis 자체가 None이면 (아직 요청 안 함) #}
+        <p class="analysis-placeholder__desc">아직 분석 요청이 없습니다.</p>
+    {% endif %}
+</div>
+{% endblock %}

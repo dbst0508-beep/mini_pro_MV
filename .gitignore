@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Django
+db.sqlite3
+media/
+
+.claude
+.env
+.vscode/

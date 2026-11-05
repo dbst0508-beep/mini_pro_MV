@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os                                                 # 환경변수(os.environ)를 읽기 위해 os 모듈 불러오기
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-j&kpfpkj!6cpw+zx)77m)3)j-&k2wq%cg!@^^ln9pak!lr%x=&'
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"] #env에서 읽어옴, 없을 시 KeyError
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG =  os.environ.get("DJANGO_DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "web"]        # 접속을 허용할 주소 목록. "web"은 cv_service가 콜백할 때 쓰는 compose 서비스 이름이라 꼭 필요함
 
 
 # Application definition
@@ -40,6 +41,8 @@ INSTALLED_APPS = [
     'accounts',
     'posts',
     'analysis',
+    'rest_framework',
+    'drf_spectacular',                                       # API 명세를 자동으로 만들어 주는 앱 (Swagger 화면의 재료를 생산)
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -77,12 +80,25 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.environ.get("POSTGRES_HOST"):                                  # 환경변수 POSTGRES_HOST가 있으면(= Docker 안에서 실행 중이면) PostgreSQL을 사용
+    DATABASES = {                                                     # Django에게 알려 줄 DB 설정 묶음
+        'default': {                                                  # 기본으로 쓸 DB 하나
+            'ENGINE': 'django.db.backends.postgresql',                # 이 DB가 PostgreSQL이라고 알려 주는 접속 모듈 이름
+            'NAME': os.environ.get("POSTGRES_DB", "mom_vision"),      # 사용할 DB 이름 (환경변수가 없으면 mom_vision)
+            'USER': os.environ.get("POSTGRES_USER", "postgres"),      # DB에 접속할 사용자 이름
+            'PASSWORD': os.environ.get("POSTGRES_PASSWORD", ""),      # 그 사용자의 비밀번호
+            'HOST': os.environ["POSTGRES_HOST"],                      # DB 서버 주소 (compose에서는 서비스 이름 db). if에서 있다고 확인했으니 바로 읽음
+            'PORT': os.environ.get("POSTGRES_PORT", "5432"),          # PostgreSQL의 기본 포트
+        }
     }
-}
+else:                                                                 # 환경변수가 없으면(= Docker 없이 로컬 실행) 기존 방식 유지
+    DATABASES = {                                                     # 기존 sqlite 설정 그대로
+        'default': {                                                  # 기본으로 쓸 DB 하나
+            'ENGINE': 'django.db.backends.sqlite3',                   # sqlite3 접속 모듈
+            'NAME': BASE_DIR / 'db.sqlite3',                          # 프로젝트 폴더의 db.sqlite3 파일
+        }
+    }
+
 
 
 # Password validation
@@ -120,6 +136,57 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static'] 
+
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Celery
+CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")      # 환경변수 REDIS_URL이 있으면 그 값, 없으면 기존 localhost 값 사용 (작업 큐)
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://localhost:6379/0")  # 결과 저장소도 같은 방식으로 환경변수 우선
+CELERY_ACCEPT_CONTENT = ["json"]                          # task 인자/결과를 json으로만 주고받음 (보안상 pickle 금지)
+CELERY_TASK_SERIALIZER = "json"                            # task 인자 직렬화 방식
+CELERY_RESULT_SERIALIZER = "json"                           # 결과 직렬화 방식
+
+# 콜백 URL 조립에 쓸 내부 서버 주소 (지금은 Celery task가 Django 자기 자신을 호출하는 데 사용,
+# 나중에 실제 FastAPI가 이 자리를 대체할 때는 FastAPI 쪽 설정이 되므로 여기선 그대로 둠)
+INTERNAL_BASE_URL = os.environ.get("INTERNAL_BASE_URL", "http://localhost:8000")  # 콜백 주소의 기준. compose에서는 http://web:8000으로 덮어씀
+ # CV 분석을 맡은 FastAPI 서버 주소 (cv_service/, 8001번 포트)
+CV_SERVICE_BASE_URL = os.environ.get("CV_SERVICE_BASE_URL", "http://localhost:8001")  # cv_service 주소. compose에서는 http://cv_service:8001로 덮어씀
+INTERNAL_API_TOKEN = os.environ["INTERNAL_API_TOKEN"]  # cv_service에 요청할 때 보내는 내부 출입증. 없으면 서버가 아예 안 켜짐(KeyError)
+# 로그 설정: analysis 앱의 로그(logger.error 등)를 "시각 단계 파일이름: 내용" 모양으로 터미널에 출력
+LOGGING = {
+    "version": 1,                                         # 설정 형식의 버전 (지금은 항상 1로 적는 것이 약속)
+    "disable_existing_loggers": False,                    # 이미 만들어진 다른 로거(Django 자체 로그 등)를 끄지 않음 (True면 기존 로그가 사라질 수 있음)
+    "formatters": {                                       # 출력 모양 정의
+        "basic": {                                          # 이 모양의 이름: "basic"
+            "format": "%(asctime)s %(levelname)s %(name)s: %(message)s",  # 한 줄 모양: 시각 / 단계 / 어느 파일인지 / 내용 (cv_service와 같은 형식)
+        },
+    },
+    "handlers": {                                         # 로그를 어디로 내보낼지 정의
+        "console": {                                        # 이 출구의 이름: "console"
+            "class": "logging.StreamHandler",                 # 터미널 화면으로 출력하는 파이썬 기본 도구
+            "formatter": "basic",                             # 위에서 정의한 "basic" 모양으로 출력
+        },
+    },
+    "loggers": {                                          # 어느 로거에 어떤 출구를 연결할지 정의
+        "analysis": {                                       # "analysis"로 시작하는 로거 전부 (analysis.views, analysis.tasks)
+            "handlers": ["console"],                          # 위의 "console" 출구에 연결
+            "level": "INFO",                                  # 정보 단계 이상(정보/경고/에러)을 출력
+            "propagate": False,                               # 상위(루트) 로거로 다시 넘기지 않음: 같은 로그가 두 번 찍히는 것을 막음
+        },
+    },
+}
+# API 문서(Swagger) 설정
+REST_FRAMEWORK = {                                           # DRF 전체 설정 묶음 (지금까지는 없어서 기본값만 쓰고 있었음)
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',  # DRF가 API 명세를 만들 때 drf-spectacular의 방식을 쓰도록 지정
+}
+
+
+SPECTACULAR_SETTINGS = {                                     # drf-spectacular 전용 설정 묶음
+    'TITLE': 'mom vision API',                               # Swagger 화면 맨 위에 표시될 제목
+    'DESCRIPTION': '패션 SNS 게시물·댓글·좋아요 API. AI 분석 파이프라인은 cv_service(FastAPI)의 /docs를 참고.',  # 제목 아래에 표시될 설명
+    'VERSION': '1.0.0',                                      # API 버전 표시
+    'SERVE_INCLUDE_SCHEMA': False,     # 명세 데이터 주소(/api/schema/) 자체는 Swagger 목록에 나타나지 않게 함
+    'COMPONENT_SPLIT_REQUEST': True,   # 요청용/응답용 명세를 따로 만듦 → 이미지 칸이 "주소 문자열"이 아니라 "파일 선택 버튼"으로 나옴
+}

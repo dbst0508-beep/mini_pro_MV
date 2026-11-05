@@ -1,0 +1,230 @@
+// Django가 브라우저에 심어둔 csrftoken 쿠키 값을 읽어오는 함수
+function getCookie(name) {
+    const value = `; ${document.cookie}`;      // 쿠키 전체를 세미콜론 붙여서 이어붙임
+    const parts = value.split(`; ${name}=`);   // "csrftoken=" 기준으로 문자열을 자름
+    if (parts.length === 2) {
+        return parts.pop().split(";").shift(); // 원하는 값만 뽑아냄
+    }
+}
+
+const csrftoken = getCookie("csrftoken");  // 이 페이지의 CSRF 토큰 값을 미리 읽어둠
+
+// 좋아요 버튼 "하나"에 클릭 이벤트를 걸어주는 함수. 기존 버튼이든 새로 만든 버튼이든 이 함수 하나로 재사용함
+function attachLikeHandler(button) {
+    button.addEventListener("click", async () => {
+        const postId = button.dataset.postId;  // HTML의 data-post-id 값을 읽음
+
+        // 서버의 좋아요 토글 API로 POST 요청을 보냄
+        const response = await fetch(`/api/posts/${postId}/like/`, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": csrftoken,  // 1단계에서 설명한 그 보안 토큰을 실어 보냄
+            },
+        });
+
+        const data = await response.json();  // 서버 응답(JSON)을 자바스크립트 객체로 변환
+
+        // 서버가 알려준 결과에 따라 버튼 모양을 바꿈
+        if (data.liked) {
+            button.classList.add("liked");
+            button.textContent = `♥ ${data.like_count}`;  // 서버가 준 최신 개수를 그대로 표시
+        } else {
+            button.classList.remove("liked");
+            button.textContent = `♡ ${data.like_count}`;
+        }
+    });
+}
+// class="like-button"인 버튼을 전부 찾아서, 각각에 위 함수로 이벤트를 걸어줌
+document.querySelectorAll(".like-button").forEach(attachLikeHandler);
+// 댓글 작성 폼 "하나"에 제출 이벤트를 걸어주는 함수. 기존 폼이든 새로 만든 폼이든 이 함수 하나로 재사용함
+function attachCommentFormHandler(form) {
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();  // 폼의 기본 동작(페이지 새로고침)을 막음
+
+        const section = form.closest(".comment-section");  // 이 폼을 감싸고 있는 댓글 영역(div)을 찾음
+        const postId = section.dataset.postId;              // 그 영역에 심어둔 data-post-id 값을 읽음
+        const input = form.querySelector(".comment-form__input");  // 폼 안의 입력창을 찾음
+        const content = input.value;                         // 사용자가 입력창에 쓴 텍스트
+
+        // 서버의 댓글 등록 API로 POST 요청을 보냄
+        const response = await fetch(`/api/posts/${postId}/comments/`, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": csrftoken,               // 좋아요 요청 때와 같은 CSRF 토큰
+                "Content-Type": "application/json",     // 지금 보내는 내용물이 JSON 형식이라고 서버에 알림
+            },
+            body: JSON.stringify({ content: content }), // {content: "..."} 객체를 JSON 문자열로 바꿔서 담음
+        });
+        if (!response.ok) {
+            alert("댓글을 등록하지 못했습니다. 내용을 확인해주세요.");  // 사용자에게 실패했다고 알려줌
+            return;  // 여기서 함수 실행을 끝냄 (아래에 있는, 화면에 댓글 추가하는 코드는 실행 안 됨)
+        }
+        const comment = await response.json();  // 서버가 만들어준 댓글 정보(작성자, 내용, id 등)를 받음
+
+        const list = section.querySelector(".comment-list");  // 이 게시물의 댓글 목록(ul)을 찾음
+        const item = document.createElement("li");             // 새 댓글을 담을 <li> 태그를 하나 만듦
+        item.className = "comment-list__item";                 // CSS가 먹도록 클래스 이름을 붙여줌
+        item.dataset.commentId = comment.id;                    // 서버 렌더링 버전과 동일하게 댓글 id를 심어둠 (수정/삭제 버튼이 찾을 수 있도록)
+
+ // 댓글 작성자는 항상 "나 자신"이므로, body에 심어둔 내 아바타 URL을 그대로 씀
+        const avatarUrl = document.body.dataset.currentAvatarUrl;
+        const avatarImg = avatarUrl ? `<img class="comment-list__avatar" src="${avatarUrl}" alt="${comment.user}">` : "";
+
+       // 서버가 렌더링하는 것과 똑같은 구조로 내부를 채움: 작성자(아바타+링크), 내용, 수정/삭제 버튼
+        item.innerHTML = `
+            <strong>
+                <a href="/accounts/mypage/${comment.user}/" class="comment-list__username">${avatarImg}${comment.user}</a>
+            </strong>
+            <span class="comment-list__content"></span>
+            <button class="comment-edit-button">수정</button>
+            <button class="comment-delete-button">삭제</button>
+        `;
+        item.querySelector(".comment-list__content").textContent = comment.content;  // 사용자가 쓴 글은 HTML로 해석되지 않게 글자로만 넣음 (XSS 방지)
+        // 방금 만든 수정/삭제 버튼에도, 아래에서 만든 함수를 그대로 재사용해서 이벤트를 걸어줌
+        list.appendChild(item);  // 만든 <li>를 목록 맨 끝에 실제로 붙임        
+        attachDeleteHandler(item.querySelector(".comment-delete-button"));
+        attachEditHandler(item.querySelector(".comment-edit-button"));
+        input.value = "";  // 등록 후 입력창을 다시 빈 칸으로 비움
+    });
+}
+// class="comment-form"인 폼을 전부 찾아서, 각각에 위 함수로 이벤트를 걸어줌 (지금까지 이 줄이 없어서 서버가 처음 그려준 댓글 폼은 눌러도 아무 반응이 없었음)
+document.querySelectorAll(".comment-form").forEach(attachCommentFormHandler);
+
+// 삭제 버튼 "하나"에 클릭 이벤트를 걸어주는 함수. 기존 버튼이든 새로 만든 버튼이든 이 함수 하나로 재사용함
+function attachDeleteHandler(button) {
+    button.addEventListener("click", async () => {
+        const item = button.closest(".comment-list__item");  // 이 버튼이 속한 댓글 <li>를 찾음
+        const commentId = item.dataset.commentId;              // 그 <li>에 심어둔 댓글 id
+        const postId = button.closest(".comment-section").dataset.postId;  // 이 댓글이 속한 게시물 id
+
+        const confirmed = confirm("댓글을 삭제하시겠습니까?");  // 브라우저 기본 확인창 (확인/취소 버튼)
+        if (!confirmed) {
+            return;  // "취소"를 누르면 여기서 함수를 끝내고 아무 일도 안 일어남
+        }
+
+        // 서버의 댓글 삭제 API로 DELETE 요청을 보냄
+        const response = await fetch(`/api/posts/${postId}/comments/${commentId}/`, {
+            method: "DELETE",
+            headers: {
+                "X-CSRFToken": csrftoken,  // 지금까지와 같은 CSRF 토큰
+            },
+        });
+
+        if (!response.ok) {
+            alert("댓글을 삭제하지 못했습니다.");  // 실패 시 알림
+            return;
+        }
+
+        item.remove();  // 성공했으면 화면에서 이 댓글 <li>를 통째로 없앰
+    });
+}
+document.querySelectorAll(".comment-delete-button").forEach(attachDeleteHandler);
+
+// 수정 버튼 "하나"에 클릭 이벤트를 걸어주는 함수. 기존 버튼이든 새로 만든 버튼이든 이 함수 하나로 재사용함
+function attachEditHandler(button) {
+    button.addEventListener("click", async () => {
+        const item = button.closest(".comment-list__item");           // 이 버튼이 속한 댓글 <li>
+        const content = item.querySelector(".comment-list__content"); // 댓글 텍스트가 담긴 span
+
+        if (button.textContent === "수정") {
+            // 지금 "수정" 상태라면 → 텍스트를 입력창으로 바꿔주는 모드
+            const input = document.createElement("input");  // 수정용 입력창을 새로 만듦
+            input.type = "text";
+            input.className = "comment-edit-input";          // CSS 스타일 적용용 클래스
+            input.value = content.textContent;                // 지금 댓글 내용을 입력창 기본값으로 채움
+            content.replaceWith(input);  // 화면에서 텍스트(span)를 입력창으로 통째로 바꿔치기
+            input.focus();                // 바로 타이핑할 수 있게 입력창에 커서를 놓음
+
+            button.textContent = "저장"; // 문구를 "수정"에서 "저장"으로 바꿈
+        } else {
+            // 지금 "저장" 상태라면 → 입력창 내용을 서버에 실제로 반영하는 모드
+            const input = item.querySelector(".comment-edit-input");  // 방금 만들어둔 입력창을 찾음
+            const commentId = item.dataset.commentId;                  // 이 댓글의 id
+            const postId = button.closest(".comment-section").dataset.postId;  // 이 댓글이 속한 게시물 id
+
+            // 서버의 댓글 수정 API로 PATCH 요청을 보냄
+            const response = await fetch(`/api/posts/${postId}/comments/${commentId}/`, {
+                method: "PATCH",
+                headers: {
+                    "X-CSRFToken": csrftoken,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ content: input.value }),  // 입력창에 지금 쓰여있는 값을 보냄
+            });
+
+            if (!response.ok) {
+                alert("댓글을 수정하지 못했습니다.");
+                return;
+            }
+
+            const comment = await response.json();  // 서버가 돌려준, 수정 완료된 댓글 정보
+
+            const newContent = document.createElement("span");   // 다시 보여줄 텍스트용 span을 새로 만듦
+            newContent.className = "comment-list__content";
+            newContent.textContent = comment.content;              // 서버가 확정해준 최신 내용으로 채움
+
+            input.replaceWith(newContent);  // 입력창을 다시 텍스트(span)로 바꿔치기
+            button.textContent = "수정";     // 버튼 문구를 다시 "수정"으로 되돌림
+        }
+    });
+}
+
+// class="comment-edit-button"인 버튼을 전부 찾아서, 각각에 위 함수로 이벤트를 걸어줌
+document.querySelectorAll(".comment-edit-button").forEach(attachEditHandler);
+
+const uploadForm = document.querySelector(".post-upload-form");  // 업로드 폼 (비로그인 유저는 애초에 없을 수 있음)
+
+if (uploadForm) {  // 폼이 있을 때만(=로그인한 경우만) 이벤트를 검
+    uploadForm.addEventListener("submit", async (event) => {
+        event.preventDefault();  // 폼의 기본 동작(페이지 새로고침) 막음
+
+        const formData = new FormData(uploadForm);  // 폼 안의 input들을 name 속성 기준으로 자동으로 모아줌 (파일 포함)
+
+        // 서버의 게시물 생성 API로 POST 요청을 보냄
+        const response = await fetch("/api/posts/", {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": csrftoken,  // CSRF 토큰만 실어 보냄 (Content-Type은 일부러 안 씀, 아래 설명)
+            },
+            body: formData,  // FormData를 그대로 body에 넣음
+        });
+
+        if (!response.ok) {
+            alert("게시물을 등록하지 못했습니다. 이미지를 확인해주세요.");
+            return;
+        }
+
+        const post = await response.json();  // 서버가 만들어준 게시물 정보(id, user, image, caption 등)
+
+        const article = document.createElement("article");  // 새 게시물 카드를 담을 태그
+        article.className = "post-card";  // feed.html의 기존 카드와 동일한 클래스
+
+        // 서버가 렌더링하는 게시물 카드와 똑같은 구조로 채움 (좋아요 0, 댓글 없음인 상태로 시작)
+        article.innerHTML = `
+            <header class="post-card__header">
+                <span class="post-card__username">${post.user}</span>
+            </header>
+            <img class="post-card__image" src="${post.image}" alt="">
+            <div class="post-card__actions">
+                <button class="like-button" data-post-id="${post.id}">♡ 0</button>
+            </div>
+            <div class="comment-section" data-post-id="${post.id}">
+                <ul class="comment-list"></ul>
+                <form class="comment-form">
+                    <input type="text" class="comment-form__input" placeholder="댓글 달기..." required>
+                    <button type="submit" class="comment-form__submit">게시</button>
+                </form>
+            </div>
+            <p class="post-card__caption"><strong>${post.user}</strong> </p>
+        `;
+        article.querySelector(".post-card__image").alt = post.caption;    // 속성에 넣을 때도 직접 대입하면 글자로만 들어감
+        uploadForm.after(article);  // 업로드 폼 바로 다음(=피드 맨 위)에 새 카드를 끼워 넣음
+        article.querySelector(".post-card__caption").append(post.caption); // append(문자열)은 글자 덩어리로 붙임 → 태그로 해석 안 됨
+
+        // 새로 만든 카드 안의 좋아요 버튼/댓글 폼에도 이벤트를 걸어줌 (방금 함수로 분리해둔 덕분에 가능)
+        attachLikeHandler(article.querySelector(".like-button"));
+        attachCommentFormHandler(article.querySelector(".comment-form"));
+
+        uploadForm.reset();  // 폼 입력값(선택한 파일, 캡션)을 전부 비움
+    });
+}

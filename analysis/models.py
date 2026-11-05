@@ -1,4 +1,11 @@
 from django.db import models
+from django.conf import settings  # settings.AUTH_USER_MODEL(우리 User 모델 이름)을 쓰기 위해
+import uuid
+from pathlib import Path
+
+def analysis_image_path(instance, filename):
+    """독립 업로드 사진도 무작위 이름으로 저장"""
+    return f"analysis_uploads/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
 
 
 class Analysis(models.Model):
@@ -16,11 +23,25 @@ class Analysis(models.Model):
         (STATUS_FAILED, "실패"),
     ]
 
+    # 누가 요청한 분석인지 (독립 업로드 결과를 본인만 보게 하고, 요청 횟수를 셀 때 씀)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,  # accounts.User를 문자열로 참조 (posts/models.py와 같은 방식)
+        on_delete=models.CASCADE,  # 회원이 탈퇴하면 그 사람의 분석 기록도 같이 삭제
+        related_name="analyses",  # user.analyses.all()로 내 분석 목록 조회
+        null=True, blank=True,  # 이 필드를 만들기 전에 생긴 분석들은 주인을 알 수 없으므로 비워 둘 수 있게
+    )
+
+
     # 어느 게시물에 대한 분석인지 연결 (FK라서 한 Post에 여러 Analysis 가능 = 재분석 허용)
     post = models.ForeignKey(
         "posts.Post",  # 다른 앱의 모델이라 "앱이름.모델명" 문자열로 참조
         on_delete=models.CASCADE,  # 게시물 삭제되면 분석 기록도 같이 삭제
         related_name="analyses",  # post.analyses.all()로 조회 가능
+        null=True, blank=True,  # B 플로우(독립 업로드)는 게시물 없이 분석하므로 비워둘 수 있게 변경
+    )
+    image = models.ImageField(
+        upload_to=analysis_image_path,  # B 플로우 업로드 이미지 → media/analysis_uploads/무작위이름.jpg
+        blank=True, null=True,  # post가 있는 A 플로우(게시물 기반)에서는 이 필드가 비어있음
     )
     status = models.CharField(
         max_length=20,
@@ -29,11 +50,18 @@ class Analysis(models.Model):
     )
     callback_token = models.CharField(max_length=64, unique=True)  # FastAPI 콜백 요청 검증용 토큰
     error_message = models.TextField(blank=True)  # 실패 시 에러 내용, 평소엔 빈 문자열
+    interpretation = models.TextField(blank=True)  # LLM이 생성한 스타일 해석 텍스트, 분석 완료 전엔 빈 문자열
     created_at = models.DateTimeField(auto_now_add=True)  # 생성 시각, 최초 1회만 기록
     updated_at = models.DateTimeField(auto_now=True)  # 저장할 때마다 갱신되는 시각 (status 바뀔 때마다 갱신)
 
-    def __str__(self):
-        return f"Analysis #{self.pk} ({self.status})"
+    @property  # analysis.source_image 처럼 괄호 없이 값처럼 꺼내 쓸 수 있게 해주는 표시
+    def source_image(self):
+        """분석 대상 사진: 독립 업로드면 image, 게시물 기반이면 post.image"""
+        return self.image if self.image else self.post.image
+    
+    def __str__(self):                                        # 분석 기록을 문자열로 보여줄 때 쓰는 이름
+        target = str(self.post) if self.post_id else "독립 업로드"  # 게시물 기반이면 게시물 이름(위 Post.__str__), 아니면 "독립 업로드"
+        return f"{target} · 분석 #{self.pk}"                    # "게시물 #1 (캡션) · 분석 #3"처럼 대상 + 분석 번호 (재분석하면 번호가 달라서 구분됨)
 
 class DetectedItem(models.Model):
     # 어느 분석 결과에 속한 아이템인지 연결
@@ -53,8 +81,10 @@ class DetectedItem(models.Model):
 
     search_url = models.URLField(blank=True)  # 조립된 쇼핑 검색 링크
 
-    def __str__(self):
-        return f"{self.category} (analysis #{self.analysis_id})"
+
+    def __str__(self):                                        # 탐지된 아이템을 문자열로 보여줄 때 쓰는 이름
+        name = f"{self.category} ({self.label})" if self.label else self.category  # 세부 라벨이 있으면 "상의 (니트)", 없으면 "상의"
+        return f"{self.analysis} · {name}"                     # "게시물 #1 (캡션) · 분석 #3 · 상의 (니트)"처럼 어느 분석의 아이템인지까지 표시
 
 
 class StyleScore(models.Model):
@@ -71,6 +101,5 @@ class StyleScore(models.Model):
         # 같은 analysis 안에 같은 style_name이 중복으로 들어가는 것 방지
         unique_together = ("analysis", "style_name")
 
-    def __str__(self):
-        return f"{self.style_name} {self.ratio}% (analysis #{self.analysis_id})"
-
+    def __str__(self):                                        # 스타일 비율을 문자열로 보여줄 때 쓰는 이름
+        return f"{self.analysis} · {self.style_name} {self.ratio}%"  # "게시물 #1 (캡션) · 분석 #3 · 캐주얼 60.0%"처럼 어느 분석의 점수인지까지 표시

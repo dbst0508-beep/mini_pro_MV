@@ -1,0 +1,5 @@
+# 컨테이너에 복사하지 않을 것들 (Dockerfile의 COPY가 실수로 가져가지 않게 막는 목록)
+.venv
+.env
+__pycache__
+testss
