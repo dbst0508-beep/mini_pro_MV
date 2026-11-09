@@ -16,7 +16,7 @@ from django.conf import settings
 from posts.models import Post  # 분석 대상이 될 게시물
 from .models import Analysis  # 테스트할 분석 모델
 from .tasks import mark_failed, run_analysis  # 테스트할 실패 기록 함수와 분석 task
-from .views import STALE_AFTER  # "이 시간이 지나면 실패"의 기준값 (6분)을 그대로 가져다 씀
+from .views import STALE_AFTER, RATE_LIMIT_COUNT # 기준값(10건, 6분)을 테스트에 숫자로 다시 적지 않고 그대로 가져다 씀
 
 User = get_user_model()  # accounts.User 모델을 "User"라는 이름으로 사용
 
@@ -145,6 +145,7 @@ class AnalysisCallbackTests(AnalysisTestCase):
 @patch("analysis.views.run_analysis")  # 이 클래스의 테스트 동안 views.py의 run_analysis를 가짜로 바꿈 → 각 테스트가 mock_task로 받음
 class RequestAnalysisTests(AnalysisTestCase):
     def test_logged_in_user_can_request_on_others_post(self, mock_task):
+        Analysis.objects.filter(pk=self.analysis.pk).update(status=Analysis.STATUS_COMPLETED)  # setUp의 분석을 "완료"로 (진행 중이면 새 요청이 막히므로)        
         self.client.force_login(self.other_user)  # 게시물 주인이 아닌 유저로 로그인
         response = self.client.post(reverse("analysis:request", args=[self.post.id]))
 
@@ -208,7 +209,56 @@ class RequestAnalysisTests(AnalysisTestCase):
         self.assertEqual(Analysis.objects.count(), 1)
         mock_task.delay.assert_not_called()
         self.assertIn("10MB", str(list(get_messages(response.wsgi_request))[0]))  # 크기 안내 문구여야 함
+    def fill_rate_limit(self):
+        """self.user가 최근에 분석을 한도만큼 요청한 상태로 만듦 (게시물 없는 분석이라 진행 중 검사와는 무관)"""
+        for number in range(RATE_LIMIT_COUNT):
+            Analysis.objects.create(user=self.user, callback_token=f"limit-{number}")
 
+    def test_request_while_in_progress_does_not_create_new(self, mock_task):
+        self.client.force_login(self.other_user)
+        response = self.client.post(reverse("analysis:request", args=[self.post.id]))  # setUp의 분석이 아직 "대기중"
+
+        self.assertEqual(Analysis.objects.count(), 1)  # 새 분석이 생기면 안 됨
+        mock_task.delay.assert_not_called()
+        self.assertRedirects(response, reverse("analysis:result", args=[self.post.id]), fetch_redirect_response=False)  # 진행 중 화면으로
+
+    def test_request_over_limit_is_rejected(self, mock_task):
+        Analysis.objects.filter(pk=self.analysis.pk).update(status=Analysis.STATUS_COMPLETED)  # 진행 중 검사에 걸리지 않게
+        self.fill_rate_limit()
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("analysis:request", args=[self.post.id]))
+
+        self.assertEqual(Analysis.objects.count(), 1 + RATE_LIMIT_COUNT)  # setUp 1건 + 채운 10건, 더 늘면 안 됨
+        mock_task.delay.assert_not_called()
+        self.assertRedirects(response, reverse("posts:detail", args=[self.post.id]), fetch_redirect_response=False)
+        self.assertIn("너무 많습니다", str(list(get_messages(response.wsgi_request))[0]))
+
+    def test_old_requests_do_not_count(self, mock_task):
+        Analysis.objects.filter(pk=self.analysis.pk).update(status=Analysis.STATUS_COMPLETED)
+        self.fill_rate_limit()
+        Analysis.objects.filter(callback_token__startswith="limit-").update(
+            created_at=timezone.now() - timedelta(hours=2)  # 채운 10건을 2시간 전 요청으로 바꿈 (auto_now_add라 create로는 못 바꿔서 update 사용)
+        )
+        self.client.force_login(self.user)
+        self.client.post(reverse("analysis:request", args=[self.post.id]))
+
+        self.assertEqual(Analysis.objects.count(), 2 + RATE_LIMIT_COUNT)  # 1시간이 지난 요청은 안 세므로 새 분석이 생겨야 함
+        mock_task.delay.assert_called_once()
+
+    def test_upload_over_limit_is_rejected(self, mock_task):
+        self.fill_rate_limit()
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("analysis:upload"), {"image": generate_test_image()})  # 정상 사진이지만
+
+        self.assertEqual(Analysis.objects.count(), 1 + RATE_LIMIT_COUNT)  # 횟수 초과라 새 분석이 생기면 안 됨
+        mock_task.delay.assert_not_called()
+        self.assertRedirects(response, reverse("analysis:home"), fetch_redirect_response=False)
+    def test_home_shows_remaining_requests(self, mock_task):
+        Analysis.objects.create(user=self.user, callback_token="used-1")  # 최근 1시간에 1건 요청한 상태
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("analysis:home"))
+
+        self.assertContains(response, f"{RATE_LIMIT_COUNT - 1} / {RATE_LIMIT_COUNT}")  # "9 / 10"이 화면에 보여야 함
 # 독립 업로드 분석 접근 제한 테스트 코드 (결과 화면 + 상태 조회)
 class StandaloneAccessTests(AnalysisTestCase):
     def setUp(self):

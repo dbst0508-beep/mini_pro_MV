@@ -2,7 +2,7 @@ from django.shortcuts import render , get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-
+from analysis.views import RATE_LIMIT_COUNT, remaining_requests  # 분석 버튼 아래에 남은 횟수를 보여 주기 위함
 
 from .models import Post, Comment, Like
 
@@ -59,8 +59,13 @@ def post_detail(request, post_id):  # URL의 <int:post_id> 부분 값이 post_id
     else:
         post.is_liked = False  # 로그인 안 한 사람은 좋아요를 누른 적이 있을 수 없음
 
-    return render(request, "posts/detail.html", {"post": post, "latest_analysis": latest_analysis})
-
+    remaining = remaining_requests(request.user) if request.user.is_authenticated else None
+    return render(request, "posts/detail.html", {
+        "post": post,
+        "latest_analysis": latest_analysis,
+        "remaining_requests": remaining,
+        "rate_limit_count": RATE_LIMIT_COUNT,
+    })
 @extend_schema_view(                                                  # 이 클래스의 메서드(GET/POST)마다 Swagger 설명을 따로 붙이는 데코레이터
     get=extend_schema(tags=["게시물"], summary="게시물 목록 조회"),           # GET 요청: "게시물" 그룹에 묶고, 한 줄 설명 표시
     post=extend_schema(tags=["게시물"], summary="게시물 작성 (로그인 필요)", request={"multipart/form-data": PostSerializer}),  # POST 요청 본문을 파일 업로드(multipart) 형식으로만 문서화 → Swagger에 파일 선택 버튼이 나옴

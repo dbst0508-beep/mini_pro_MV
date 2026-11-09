@@ -18,11 +18,24 @@ from .models import Analysis, DetectedItem, StyleScore      # 이 view에서 쓸
 
 STALE_AFTER = timedelta(minutes=6)  # 요청 후 이 시간이 지나도 안 끝나면 실패로 봄 (Celery의 최대 대기 5분보다 길게)
 
+RATE_LIMIT_COUNT = 10                  # 한 사람이 아래 시간 동안 요청할 수 있는 분석 수 (분석마다 Gemini 호출 = 비용)
+RATE_LIMIT_WINDOW = timedelta(hours=1)  # 횟수를 세는 기간
+
+def remaining_requests(user):
+    """최근 1시간 기준으로 이 사람이 더 요청할 수 있는 분석 수 (0 미만으로는 안 내려감)"""
+    since = timezone.now() - RATE_LIMIT_WINDOW                       # 지금부터 1시간 전 시각
+    recent = Analysis.objects.filter(user=user, created_at__gte=since).count()  # 그 이후에 만든 내 분석 수
+    return max(RATE_LIMIT_COUNT - recent, 0)                         # 동시 요청으로 한도를 넘었어도 음수 대신 0
+
+
+def is_rate_limited(user):
+    """더 요청할 수 있는 횟수가 0이면 True"""
+    return remaining_requests(user) == 0
 logger = logging.getLogger(__name__)  # 이 파일 전용 기록 담당자 (이름은 "analysis.views"가 됨)
 
 def home(request):                                          # AI 분석 탭의 첫 화면 (사진 업로드 폼)
-    return render(request, "analysis/home.html")              # analysis/home.html 템플릿을 화면으로 보여줌
-
+    remaining = remaining_requests(request.user) if request.user.is_authenticated else None  # 로그인 안 했으면 안 보여 줌
+    return render(request, "analysis/home.html", {"remaining_requests": remaining, "rate_limit_count": RATE_LIMIT_COUNT})
 
 @csrf_exempt                                                  # CSRF 토큰 검사 생략 (콜백_token으로 대신 검증하니까)
 @require_POST                                                  # POST 요청만 허용, 다른 방식이면 405 에러
@@ -75,6 +88,16 @@ def analysis_callback(request, analysis_id):
 @require_POST                                                  # 버튼 누르는 폼의 POST 요청만 허용
 def request_analysis(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
+    in_progress = post.analyses.filter(
+        status__in=[Analysis.STATUS_PENDING, Analysis.STATUS_PROCESSING]  # 대기중 또는 분석중인 것
+    ).exists()                                                       # 하나라도 있으면 True
+    if in_progress:                                                  # 이미 분석이 돌고 있으면
+        return redirect("analysis:result", post_id=post.id)          # 새로 만들지 않고 진행 중 화면으로
+
+    if is_rate_limited(request.user):                                # 최근 요청이 너무 많으면
+        messages.error(request, "분석 요청이 너무 많습니다. 1시간 뒤에 다시 시도해 주세요.")
+        return redirect("posts:detail", post_id=post.id)             # 분석은 만들지 않고 게시물 화면으로
+    
 
     analysis = Analysis.objects.create(                            # 누구 게시물이든 상관없이 바로 생성
         user=request.user,                                           # 요청한 사람을 주인으로 기록
@@ -116,6 +139,10 @@ def upload_and_analyze(request):
     except ValidationError as error:
         messages.error(request, error.messages[0])                 # 실패 이유를 화면에 보여 주도록 남김
         return redirect("analysis:home")                           # 업로드 화면으로 돌려보냄 (분석은 만들지 않음)
+    if is_rate_limited(request.user):                                # 독립 업로드도 같은 횟수에 포함
+        messages.error(request, "분석 요청이 너무 많습니다. 1시간 뒤에 다시 시도해 주세요.")
+        return redirect("analysis:home")
+    
     analysis = Analysis.objects.create(                          # post= 대신 image= 로 생성 (post는 비워둠)
         user=request.user,                                         # 업로드한 사람을 주인으로 기록
         image=image,

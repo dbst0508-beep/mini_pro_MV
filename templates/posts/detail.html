@@ -25,6 +25,7 @@
         {% if latest_analysis %}AI 재분석 요청{% else %}AI 분석 요청{% endif %}
     </button>
 </form>
+<p class="rate-limit-hint">최근 1시간 남은 분석 횟수: {{ remaining_requests }} / {{ rate_limit_count }}</p>
 {% endif %}
 </div>
 {% endblock %}
