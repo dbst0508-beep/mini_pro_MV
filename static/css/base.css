@@ -181,3 +181,9 @@ main {
     background: #fdecec;                            /* 옅은 빨강 배경: 문제가 있다는 신호 */
     color: #b42318;                                 /* 진한 빨강 글자 */
 }
+
+.rate-limit-hint {                                  /* 분석 버튼 아래 "남은 횟수" 안내 */
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);                 /* 은은한 보조 글자색 */
+}

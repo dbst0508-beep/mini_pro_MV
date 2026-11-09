@@ -25,6 +25,7 @@
         <input type="file" name="image" accept="image/*" required>  {# view의 request.FILES["image"]와 이름 맞춤 #}
         <button type="submit" class="btn btn--primary">분석 시작</button>
     </form>
+    <p class="rate-limit-hint">최근 1시간 남은 분석 횟수: {{ remaining_requests }} / {{ rate_limit_count }}</p>
     {% else %}
     <a href="{% url 'accounts:login_page' %}" class="btn btn--primary">로그인하고 분석하기</a>  {# 업로드 view가 @login_required라 익명은 막힘 #}
     {% endif %}
