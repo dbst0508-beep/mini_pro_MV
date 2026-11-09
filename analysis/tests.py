@@ -253,7 +253,12 @@ class RequestAnalysisTests(AnalysisTestCase):
         self.assertEqual(Analysis.objects.count(), 1 + RATE_LIMIT_COUNT)  # 횟수 초과라 새 분석이 생기면 안 됨
         mock_task.delay.assert_not_called()
         self.assertRedirects(response, reverse("analysis:home"), fetch_redirect_response=False)
+    def test_home_shows_remaining_requests(self, mock_task):
+        Analysis.objects.create(user=self.user, callback_token="used-1")  # 최근 1시간에 1건 요청한 상태
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("analysis:home"))
 
+        self.assertContains(response, f"{RATE_LIMIT_COUNT - 1} / {RATE_LIMIT_COUNT}")  # "9 / 10"이 화면에 보여야 함
 # 독립 업로드 분석 접근 제한 테스트 코드 (결과 화면 + 상태 조회)
 class StandaloneAccessTests(AnalysisTestCase):
     def setUp(self):
