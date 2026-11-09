@@ -21,17 +21,21 @@ STALE_AFTER = timedelta(minutes=6)  # 요청 후 이 시간이 지나도 안 끝
 RATE_LIMIT_COUNT = 10                  # 한 사람이 아래 시간 동안 요청할 수 있는 분석 수 (분석마다 Gemini 호출 = 비용)
 RATE_LIMIT_WINDOW = timedelta(hours=1)  # 횟수를 세는 기간
 
-def is_rate_limited(user):
-    """최근 1시간 동안 이 사람이 요청한 분석이 10건 이상이면 True"""
+def remaining_requests(user):
+    """최근 1시간 기준으로 이 사람이 더 요청할 수 있는 분석 수 (0 미만으로는 안 내려감)"""
     since = timezone.now() - RATE_LIMIT_WINDOW                       # 지금부터 1시간 전 시각
     recent = Analysis.objects.filter(user=user, created_at__gte=since).count()  # 그 이후에 만든 내 분석 수
-    return recent >= RATE_LIMIT_COUNT
+    return max(RATE_LIMIT_COUNT - recent, 0)                         # 동시 요청으로 한도를 넘었어도 음수 대신 0
 
+
+def is_rate_limited(user):
+    """더 요청할 수 있는 횟수가 0이면 True"""
+    return remaining_requests(user) == 0
 logger = logging.getLogger(__name__)  # 이 파일 전용 기록 담당자 (이름은 "analysis.views"가 됨)
 
 def home(request):                                          # AI 분석 탭의 첫 화면 (사진 업로드 폼)
-    return render(request, "analysis/home.html")              # analysis/home.html 템플릿을 화면으로 보여줌
-
+    remaining = remaining_requests(request.user) if request.user.is_authenticated else None  # 로그인 안 했으면 안 보여 줌
+    return render(request, "analysis/home.html", {"remaining_requests": remaining, "rate_limit_count": RATE_LIMIT_COUNT})
 
 @csrf_exempt                                                  # CSRF 토큰 검사 생략 (콜백_token으로 대신 검증하니까)
 @require_POST                                                  # POST 요청만 허용, 다른 방식이면 405 에러
