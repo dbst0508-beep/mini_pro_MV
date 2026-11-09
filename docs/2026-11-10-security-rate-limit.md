@@ -8,6 +8,7 @@
 |---|---|
 | `c249199` | feat: 분석 요청을 사용자당 1시간 10건으로 제한하고 진행 중인 게시물 분석의 중복 요청 방지 |
 | `bee1c5c` | test: 분석 요청 횟수 제한과 진행 중 중복 요청 방지 테스트 추가 |
+| (이후 커밋) | feat/test: 분석 버튼 아래에 남은 요청 횟수 표시 |
 
 ---
 
@@ -37,6 +38,7 @@
 | 사용자당 최대 요청 | **1시간에 10건** (`RATE_LIMIT_COUNT`, `RATE_LIMIT_WINDOW`) | 체크리스트 예시는 1분에 3건이었지만, 분석마다 Gemini 호출이 나가므로 무료 한도를 생각하면 시간 단위가 더 실용적. 정상 사용자가 1시간에 10번 넘게 분석할 일은 드묾 |
 | 세는 대상 | 게시물 기반 + 독립 업로드 **합산**, 상태 무관 | 둘 다 같은 Gemini를 씀. 실패한 분석도 이미 모델·Gemini를 썼을 수 있으므로 셈 |
 | 진행 중 중복 | 같은 게시물에 `대기중`/`분석중` 분석이 있으면 새로 만들지 않고 결과 화면으로 | 버튼을 여러 번 눌러도 분석은 하나. 완료·실패 뒤에는 기존처럼 재분석 가능 |
+| 남은 횟수 표시 | 게시물 상세·AI 분석 화면의 분석 버튼 아래에 `최근 1시간 남은 분석 횟수: 7 / 10` (로그인한 사람만) | 10번째에 갑자기 막히는 대신, 미리 얼마나 남았는지 알 수 있게 |
 
 ### 1-3. 요청이 거치는 검사 순서
 
@@ -61,8 +63,11 @@
 
 | 파일 | 바뀐 내용 |
 |---|---|
-| `analysis/views.py` | `RATE_LIMIT_COUNT`, `RATE_LIMIT_WINDOW`, `is_rate_limited()` 추가. `request_analysis`에 진행 중 검사 + 횟수 검사, `upload_and_analyze`에 횟수 검사 |
-| `analysis/tests.py` | 새 규칙 테스트 4개, 기존 테스트 1개 준비 단계 수정 (Django 62 → 66개) |
+| `analysis/views.py` | `RATE_LIMIT_COUNT`, `RATE_LIMIT_WINDOW`, `remaining_requests()`, `is_rate_limited()` 추가. `request_analysis`에 진행 중 검사 + 횟수 검사, `upload_and_analyze`에 횟수 검사, `home`이 남은 횟수를 화면에 넘김 |
+| `posts/views.py` | `post_detail`이 남은 횟수를 화면에 넘김 (`analysis.views`에서 함수와 한도를 가져옴) |
+| `templates/posts/detail.html`, `templates/analysis/home.html` | 분석 버튼 아래 남은 횟수 문구 |
+| `static/css/base.css` | `.rate-limit-hint` (작은 회색 글씨) |
+| `analysis/tests.py` | 새 규칙 테스트 5개, 기존 테스트 1개 준비 단계 수정 (Django 62 → 67개) |
 | `README.md` | 요청 제한 설명, Gemini 무료 등급 데이터 고지, 남은 보안 항목을 알려진 한계로 정리 |
 
 DB 구조는 바뀌지 않았습니다(마이그레이션 없음). C에서 만든 `user`, 원래 있던 `created_at`, `status`만으로 셉니다.
@@ -71,8 +76,9 @@ DB 구조는 바뀌지 않았습니다(마이그레이션 없음). C에서 만�
 
 | 확인 | 결과 |
 |---|---|
-| Django 테스트 | 66개 통과 (posts 17 · accounts 15 · analysis 34) |
+| Django 테스트 | 67개 통과 (posts 17 · accounts 15 · analysis 35) |
 | cv_service 테스트 | 30개 (변경 없음) |
+| Docker 재빌드 후 브라우저 | 게시물 상세·AI 분석 화면에 남은 횟수 표시, 분석 1번 요청 후 숫자 1 감소, 로그아웃 상태에서는 안 보임 |
 
 ---
 
@@ -110,7 +116,24 @@ if in_progress:
 - **한계 (진짜 동시 클릭):** 2-1과 같은 틈이 있습니다. 버튼을 아주 빠르게 두 번 눌러 요청 두 개가 동시에 처리되면 둘 다 "진행 중 없음"으로 보고 분석이 두 개 생길 수 있습니다. 화면에서 버튼을 한 번 누르면 비활성화하거나, 게시물 행을 잠그면 막을 수 있습니다.
 - **독립 업로드에는 이 검사가 없습니다.** 매번 다른 사진일 수 있어서 "같은 분석"을 판단할 기준이 없습니다. 횟수 제한만 적용됩니다.
 
-### 2-3. 기준값을 위쪽 상수로
+### 2-3. `remaining_requests`: 화면 숫자와 막는 기준을 하나로
+
+```python
+def remaining_requests(user):
+    ...
+    return max(RATE_LIMIT_COUNT - recent, 0)
+
+def is_rate_limited(user):
+    return remaining_requests(user) == 0
+```
+
+- **세는 곳은 한 군데:** 처음에는 `is_rate_limited`가 직접 셌습니다. 화면에 남은 횟수를 보여 주려고 세는 함수를 따로 만들 때, 막는 함수가 **그 결과를 그대로 쓰도록** 바꿨습니다. 세는 코드가 두 벌이면 한쪽만 고쳤을 때 "화면엔 3번 남았다는데 막힘" 같은 일이 생깁니다.
+- **`max(..., 0)`:** 동시 요청으로 한도를 넘으면(2-1 한계) `10 - 11 = -1`이 됩니다. 화면에 "-1 / 10"이 나오지 않게 0으로 바닥을 깔았습니다. 막는 조건도 `== 0`이라 음수일 때도 막힙니다.
+- **`posts/views.py`가 `analysis.views`를 import:** 게시물 상세 화면에도 숫자가 필요해서 함수를 가져다 씁니다. `analysis/views.py`는 `posts/models.py`만 불러오므로 서로 물고 물리는 import(순환 import)는 생기지 않습니다.
+- **한도 숫자도 넘깁니다(`rate_limit_count`):** 템플릿에 `/ 10`을 직접 쓰면, 한도를 바꿨을 때 화면만 옛 숫자로 남습니다(5-3).
+- **대가:** 게시물 상세와 AI 분석 화면을 열 때마다 `COUNT` 쿼리가 한 번 더 나갑니다. `user`에 인덱스가 있는 가벼운 쿼리라 그대로 뒀습니다.
+
+### 2-4. 기준값을 위쪽 상수로
 
 `RATE_LIMIT_COUNT = 10`, `RATE_LIMIT_WINDOW = timedelta(hours=1)`을 파일 위쪽에 `STALE_AFTER`와 나란히 뒀습니다. 테스트도 이 상수를 import해서 쓰므로, 나중에 20건으로 바꿔도 테스트를 고칠 필요가 없습니다. 실행 환경마다 바꿀 값이 아니라서 환경변수로는 빼지 않았습니다.
 
@@ -175,7 +198,42 @@ def request_analysis(request, post_id):
     analysis = Analysis.objects.create(...)        # (기존)
 ```
 
-### 3-4. `analysis/tests.py`: 대표 테스트
+### 3-4. 남은 횟수 표시
+
+```python
+# analysis/views.py
+def remaining_requests(user):
+    """최근 1시간 기준으로 이 사람이 더 요청할 수 있는 분석 수 (0 미만으로는 안 내려감)"""
+    since = timezone.now() - RATE_LIMIT_WINDOW
+    recent = Analysis.objects.filter(user=user, created_at__gte=since).count()
+    return max(RATE_LIMIT_COUNT - recent, 0)        # max(a, 0): a가 음수면 0, 아니면 a 그대로
+
+def is_rate_limited(user):
+    """더 요청할 수 있는 횟수가 0이면 True"""
+    return remaining_requests(user) == 0            # 세는 일은 위 함수에 맡김
+
+def home(request):
+    remaining = remaining_requests(request.user) if request.user.is_authenticated else None
+    # "A if 조건 else B": 조건이 참이면 A, 아니면 B → 로그인 안 했으면 None (비로그인 유저로 DB를 셀 수 없으므로)
+    return render(request, "analysis/home.html", {"remaining_requests": remaining, "rate_limit_count": RATE_LIMIT_COUNT})
+```
+
+```html
+<!-- templates/analysis/home.html, posts/detail.html: 둘 다 {% if user.is_authenticated %} 안 -->
+<p class="rate-limit-hint">최근 1시간 남은 분석 횟수: {{ remaining_requests }} / {{ rate_limit_count }}</p>
+```
+
+```python
+# analysis/tests.py
+    def test_home_shows_remaining_requests(self, mock_task):
+        Analysis.objects.create(user=self.user, callback_token="used-1")  # 최근 1시간에 1건 요청한 상태
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("analysis:home"))
+        self.assertContains(response, f"{RATE_LIMIT_COUNT - 1} / {RATE_LIMIT_COUNT}")
+        # assertContains: 응답이 200이고, 화면 HTML 안에 이 글자("9 / 10")가 있는지 확인
+```
+
+### 3-5. `analysis/tests.py`: 대표 테스트
 
 ```python
 from .views import STALE_AFTER, RATE_LIMIT_COUNT   # 숫자 10을 테스트에 다시 적지 않고 코드의 값을 그대로 씀
@@ -250,6 +308,12 @@ from .views import STALE_AFTER, RATE_LIMIT_COUNT   # 숫자 10을 테스트에 �
 ### 5-2. `fill_rate_limit`이 진행 중 검사에 걸리지 않게
 - **고민:** 한도를 채우려고 게시물 분석을 10개 만들면, 그 분석들이 `대기중`이라 횟수 검사 전에 진행 중 검사에 먼저 걸립니다. 그러면 횟수 제한을 시험할 수 없습니다.
 - **처리:** 한도 채우기용 분석은 **게시물 없이**(`post=None`) 만들었습니다. 횟수에는 포함되지만(같은 `user`) 이 게시물의 진행 중 검사에는 안 걸립니다. 두 규칙을 따로따로 시험할 수 있게 됐습니다.
+
+### 5-3. 템플릿에 한도 숫자 `/ 10`을 직접 씀
+- **증상:** AI 분석 화면 템플릿에 `{{ remaining_requests }} / 10`처럼 한도가 숫자로 들어갔습니다. 테스트는 통과했습니다.
+- **원인:** 안내 예시에 처음 `/ 10`으로 적었다가 아래에서 고쳐 달라고 덧붙여서, 헷갈리게 전달됐습니다. 테스트가 잡지 못한 이유는 지금 한도가 실제로 10이라 화면에 "9 / 10"이 똑같이 나오기 때문입니다.
+- **해결:** `/ {{ rate_limit_count }}`로 바꾸고, `home` 뷰가 `RATE_LIMIT_COUNT`를 넘기게 했습니다.
+- **배운 점:** 테스트가 통과해도 "**지금 값과 우연히 같아서**" 통과했을 수 있습니다. 화면에 숫자를 직접 쓰는 곳은 코드를 직접 읽어서 확인해야 합니다.
 
 ### 보안 작업 마무리: 남은 항목 (README 알려진 한계에 기록)
 | 점검표 | 내용 | 남긴 이유 |
